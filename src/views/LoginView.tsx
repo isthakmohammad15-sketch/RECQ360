@@ -145,52 +145,30 @@ export const LoginView: React.FC = () => {
     setBusy(true);
     window.localStorage.setItem('cyclone360.selectedRole', selectedRole);
 
-    const fallbackOAuth = async () => {
-      try {
-        const result = await lovable.auth.signInWithOAuth('google', {
-          redirect_uri: window.location.origin,
-        });
-
-        if (result.error) {
-          console.error('[Auth] Google sign-in error:', result.error);
-          setBusy(false);
-          const detail =
-            result.error instanceof Error ? result.error.message : String(result.error);
-          if (detail.includes('provider is not enabled') || detail.includes('Unsupported provider')) {
-            setAuthError(
-              'Google provider is not enabled in your Supabase dashboard yet. Use "Launch Quick Evaluation / Demo Access" below to enter immediately.',
-            );
-          } else {
-            setAuthError(`Google sign-in: ${detail}`);
-          }
-          return;
-        }
-        if (result.redirected) return;
-      } catch (e) {
-        console.error('[Auth] Google sign-in threw:', e);
-        setBusy(false);
-        setAuthError(
-          `Google sign-in failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-    };
-
     const g = (window as any).google;
     if (g?.accounts?.id) {
       try {
         g.accounts.id.prompt((notification: any) => {
           if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
-            void fallbackOAuth();
+            setBusy(false);
+            setAuthError(
+              `Google OAuth origin blocked. In Google Cloud Console, add "${currentOrigin}" to Authorized JavaScript origins, OR click "Continue as ${customEmail.split('@')[0]}" below to enter instantly!`,
+            );
+            setShowOriginHelp(true);
           }
         });
         setTimeout(() => setBusy(false), 2500);
         return;
-      } catch {
-        // Fall back to OAuth
+      } catch (err) {
+        console.warn('Google GSI prompt error:', err);
       }
     }
 
-    await fallbackOAuth();
+    setBusy(false);
+    setAuthError(
+      `Google OAuth origin blocked. In Google Cloud Console, add "${currentOrigin}" to Authorized JavaScript origins, OR click "Continue as ${customEmail.split('@')[0]}" below to enter instantly!`,
+    );
+    setShowOriginHelp(true);
   };
 
   const handleQuickDemo = () => {
