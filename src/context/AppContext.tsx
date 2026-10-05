@@ -287,7 +287,12 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('recq360_signed_out') === 'true') {
+      return false;
+    }
+    return true;
+  });
   const [currentUser, setCurrentUser] = useState<User>(DEFAULT_OFFICER);
   const [appRole, setAppRole] = useState<AppRole | null>('commissioner');
   const [loading, setLoading] = useState<boolean>(true);
@@ -358,7 +363,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [directory, setDirectory] = useState<DirectoryUser[]>([]);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
 
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('recq360_signed_out') === 'true') {
+      return 'landing';
+    }
+    return 'dashboard';
+  });
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedShelterId, setSelectedShelterId] = useState<string | null>(null);
@@ -697,15 +707,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [hydrateSession, loadAll]);
 
   const signOut = async () => {
-    await supabase.auth.signOut().catch(() => {});
-    setIsAuthenticated(true);
-    setAppRole('commissioner');
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    setIsAuthenticated(false);
+    setAppRole(null);
     setCurrentUser(DEFAULT_OFFICER);
-    setActiveTab('dashboard');
-    toast.info('Session reset to Chief Operations Commander.');
+    setActiveTab('landing');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('recq360_signed_out', 'true');
+    }
+    toast.success('Signed out successfully.');
   };
 
   const loginAsGuest = useCallback((role: AppRole) => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('recq360_signed_out');
+    }
     const p = OFFICER_PROFILES[role] || OFFICER_PROFILES.commissioner;
     const user: User = {
       id: `officer-${role}`,

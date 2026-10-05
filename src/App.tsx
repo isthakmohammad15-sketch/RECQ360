@@ -58,9 +58,9 @@ function CurrentView() {
 }
 
 function RECQ360() {
-  const { activeTab } = useApp();
+  const { isAuthenticated, activeTab } = useApp();
 
-  if (activeTab === "landing") {
+  if (!isAuthenticated || activeTab === "landing") {
     return <LandingView />;
   }
 
