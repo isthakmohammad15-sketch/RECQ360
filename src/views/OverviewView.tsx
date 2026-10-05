@@ -8,7 +8,6 @@ import {
   ShieldAlert,
   CheckCircle2,
   AlertTriangle,
-  Clock,
   ChevronRight,
   Truck,
   Home,
@@ -16,7 +15,6 @@ import {
   MapPin,
   RefreshCw,
   Plus,
-  Radio,
   ExternalLink,
   Eye,
   MoreHorizontal,
@@ -68,22 +66,7 @@ export const OverviewView: React.FC = () => {
   const [inspectZone, setInspectZone] = useState<Zone | null>(null);
   const [zoneToRemove, setZoneToRemove] = useState<Zone | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [timeString, setTimeString] = useState('');
 
-  React.useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeString(
-        now.toISOString().slice(0, 10) +
-          ' ' +
-          now.toLocaleTimeString('en-IN', { hour12: false }) +
-          ' IST',
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const criticalAlerts = alerts.filter((a) => !a.resolved && a.severity === 'critical');
   const readyZonesCount = zones.filter((z) => z.status === 'ready').length;
@@ -103,28 +86,6 @@ export const OverviewView: React.FC = () => {
               <span className="text-xs font-mono uppercase tracking-widest text-[#2E9CCA]">
                 LIVE DISASTER GRID • {activeCity ? activeCity.name.toUpperCase() : 'VISAKHAPATNAM'} ({activeState ? activeState.name.toUpperCase() : 'ANDHRA PRADESH'})
               </span>
-            </div>
-
-            {/* Advisory Badge + Live Timing directly beside it */}
-            <div className="flex items-center gap-2.5 flex-wrap mb-3">
-              <div
-                className={`inline-flex items-center gap-2 px-3 py-1 rounded border text-xs font-mono font-bold ${
-                  activeCity?.advisorySeverity === 'critical'
-                    ? 'border-[#E4572E]/50 bg-[#E4572E]/15 text-[#E4572E] glow-red'
-                    : activeCity?.advisorySeverity === 'warning'
-                    ? 'border-[#F2B138]/50 bg-[#F2B138]/15 text-[#F2B138]'
-                    : 'border-[#2E9CCA]/50 bg-[#2E9CCA]/15 text-[#2E9CCA]'
-                }`}
-              >
-                <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
-                <span>{activeCity?.currentAdvisory || 'CYC-STAGE 3: SEVERE COASTAL ADVISORY'}</span>
-              </div>
-
-              {/* Timing placed directly beside the advisory */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#0B1220] border border-white/15 text-slate-200 font-mono text-xs shadow-inner">
-                <Clock className="w-3.5 h-3.5 text-[#2E9CCA]" />
-                <span>{timeString}</span>
-              </div>
             </div>
 
             <h1 className="font-display font-bold text-2xl md:text-3xl text-white tracking-tight">
