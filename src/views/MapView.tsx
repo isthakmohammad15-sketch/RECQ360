@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MapPin } from 'lucide-react';
+import { MapPin, Globe } from 'lucide-react';
 import { getMapsBrowserKey } from '../lib/maps.functions';
-
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 declare global {
   interface Window {
@@ -12,6 +13,15 @@ declare global {
 }
 
 const VIZAG_CENTER = { lat: 17.7285, lng: 83.2885 };
+
+function isGoogleOAuthClientId(key: string): boolean {
+  return typeof key === 'string' && key.includes('.apps.googleusercontent.com');
+}
+
+function isValidGoogleMapsKey(key: string): boolean {
+  if (!key || isGoogleOAuthClientId(key)) return false;
+  return key.startsWith('AIzaSy') || key.length >= 35;
+}
 
 const FLOOD_HOTSPOTS = [
   { id: 'hs-1', name: 'HB Colony Low-Lying Storm Drain', lat: 17.7315, lng: 83.306, radius: 600, severity: 'High' },
@@ -35,8 +45,6 @@ async function loadGoogleMaps(): Promise<any> {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
   if (window.google?.maps) return window.google;
 
-  // Prefer a build-time key; otherwise ask the server for the configured key
-  // (kept in the project environment/secrets, never in source).
   let key: string =
     import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] ||
     import.meta.env['VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY'] ||
@@ -50,6 +58,16 @@ async function loadGoogleMaps(): Promise<any> {
     }
   }
 
+  if (!isValidGoogleMapsKey(key)) {
+    return Promise.reject(
+      new Error(
+        isGoogleOAuthClientId(key)
+          ? 'Provided key is a Google OAuth Client ID, using tactical Leaflet engine.'
+          : 'No Google Maps key found, using tactical Leaflet engine.',
+      ),
+    );
+  }
+
   return new Promise((resolve, reject) => {
     const existing = document.getElementById('gmaps-sdk');
     const channel = import.meta.env['VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID'] ?? '';
@@ -57,14 +75,6 @@ async function loadGoogleMaps(): Promise<any> {
     window.__initRECQ360Map = () => resolve(window.google);
 
     if (existing) return;
-    if (!key) {
-      reject(
-        new Error(
-          'Google Maps browser key is not configured. Add VITE_GOOGLE_MAPS_API_KEY to the project environment, then reload.',
-        ),
-      );
-      return;
-    }
 
     const script = document.createElement('script');
     script.id = 'gmaps-sdk';
@@ -74,7 +84,6 @@ async function loadGoogleMaps(): Promise<any> {
     document.head.appendChild(script);
   });
 }
-
 
 const pin = (color: string, label: string) => ({
   path: 'M 0,0 m -11,0 a 11,11 0 1,0 22,0 a 11,11 0 1,0 -22,0',
@@ -95,6 +104,10 @@ export const MapView: React.FC = () => {
   const overlaysRef = useRef<any[]>([]);
   const infoRef = useRef<any>(null);
 
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const leafletLayersRef = useRef<L.Layer[]>([]);
+
+  const [engine, setEngine] = useState<'google' | 'leaflet'>('google');
   const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState<string>('');
   const [showZones, setShowZones] = useState(true);
@@ -105,6 +118,32 @@ export const MapView: React.FC = () => {
   // Boot the SDK + map instance once.
   useEffect(() => {
     let cancelled = false;
+
+    const initLeaflet = () => {
+      if (cancelled || !containerRef.current) return;
+      try {
+        if (leafletMapRef.current) {
+          leafletMapRef.current.remove();
+          leafletMapRef.current = null;
+        }
+        const map = L.map(containerRef.current, {
+          center: [VIZAG_CENTER.lat, VIZAG_CENTER.lng],
+          zoom: 11,
+          zoomControl: true,
+        });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          subdomains: 'abcd',
+          attribution: '&copy; OpenStreetMap &copy; CARTO',
+        }).addTo(map);
+        leafletMapRef.current = map;
+        setEngine('leaflet');
+        setReady(true);
+      } catch (err: any) {
+        setMapError(err.message || 'Failed to initialise tactical basemap');
+      }
+    };
+
     loadGoogleMaps()
       .then((google) => {
         if (cancelled || !containerRef.current) return;
@@ -117,108 +156,203 @@ export const MapView: React.FC = () => {
           mapTypeControl: false,
         });
         infoRef.current = new google.maps.InfoWindow();
+        setEngine('google');
         setReady(true);
       })
-      .catch((err) => setMapError(err.message));
+      .catch((err) => {
+        console.info('[Tactical Map] Google Maps key not active, using tactical Leaflet basemap:', err.message);
+        initLeaflet();
+      });
+
     return () => {
       cancelled = true;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
     };
   }, []);
 
   // Re-draw overlays whenever data or layer toggles change.
   useEffect(() => {
-    if (!ready || !mapRef.current || !window.google) return;
-    const google = window.google;
-    const map = mapRef.current;
+    if (!ready) return;
 
-    overlaysRef.current.forEach((o) => o.setMap(null));
-    overlaysRef.current = [];
+    if (engine === 'google' && mapRef.current && window.google) {
+      const google = window.google;
+      const map = mapRef.current;
 
-    const open = (marker: any, html: string) => {
-      infoRef.current.setContent(`<div style="font-family:monospace;font-size:12px;color:#0B1220">${html}</div>`);
-      infoRef.current.open({ anchor: marker, map });
-    };
+      overlaysRef.current.forEach((o) => o.setMap(null));
+      overlaysRef.current = [];
 
-    if (showZones) {
-      zones.forEach((z) => {
-        const color = z.status === 'ready' ? '#2FBF71' : z.status === 'pending' ? '#F2B138' : '#E4572E';
-        const marker = new google.maps.Marker({
-          map,
-          position: { lat: z.coordinates[0], lng: z.coordinates[1] },
-          icon: pin(color, String(z.number)),
-          label: { text: String(z.number), color: '#fff', fontSize: '10px', fontWeight: 'bold' },
-          title: z.name,
+      const open = (marker: any, html: string) => {
+        infoRef.current.setContent(`<div style="font-family:monospace;font-size:12px;color:#0B1220">${html}</div>`);
+        infoRef.current.open({ anchor: marker, map });
+      };
+
+      if (showZones) {
+        zones.forEach((z) => {
+          const color = z.status === 'ready' ? '#2FBF71' : z.status === 'pending' ? '#F2B138' : '#E4572E';
+          const marker = new google.maps.Marker({
+            map,
+            position: { lat: z.coordinates[0], lng: z.coordinates[1] },
+            icon: pin(color, String(z.number)),
+            label: { text: String(z.number), color: '#fff', fontSize: '10px', fontWeight: 'bold' },
+            title: z.name,
+          });
+          marker.addListener('click', () => {
+            open(
+              marker,
+              `<b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%<br/>Pending tasks: ${z.pendingTaskCount}<br/>Officer: ${z.officerName}`,
+            );
+          });
+          marker.addListener('dblclick', () => navigateTo('zone-detail', { zoneId: z.id }));
+          overlaysRef.current.push(marker);
         });
-        marker.addListener('click', () => {
-          open(
-            marker,
-            `<b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%<br/>Pending tasks: ${z.pendingTaskCount}<br/>Officer: ${z.officerName}`,
+      }
+
+      if (showShelters) {
+        shelters.forEach((s) => {
+          const marker = new google.maps.Marker({
+            map,
+            position: { lat: s.coordinates[0], lng: s.coordinates[1] },
+            icon: pin('#2FBF71', 'S'),
+            label: { text: 'S', color: '#fff', fontSize: '10px', fontWeight: 'bold' },
+            title: s.name,
+          });
+          marker.addListener('click', () =>
+            open(
+              marker,
+              `<b>${s.name}</b><br/>${s.zoneName}<br/>Occupancy: ${s.currentOccupancy}/${s.capacity}<br/>Status: ${s.status}`,
+            ),
           );
+          overlaysRef.current.push(marker);
         });
-        marker.addListener('dblclick', () => navigateTo('zone-detail', { zoneId: z.id }));
-        overlaysRef.current.push(marker);
-      });
-    }
+      }
 
-    if (showShelters) {
-      shelters.forEach((s) => {
-        const marker = new google.maps.Marker({
-          map,
-          position: { lat: s.coordinates[0], lng: s.coordinates[1] },
-          icon: pin('#2FBF71', 'S'),
-          label: { text: 'S', color: '#fff', fontSize: '10px', fontWeight: 'bold' },
-          title: s.name,
+      if (showAssets) {
+        assets.forEach((a) => {
+          const color = a.status === 'ready' ? '#2E9CCA' : a.status === 'critical' ? '#E4572E' : '#F2B138';
+          const marker = new google.maps.Marker({
+            map,
+            position: { lat: a.coordinates[0], lng: a.coordinates[1] },
+            icon: pin(color, 'A'),
+            label: { text: 'A', color: '#fff', fontSize: '10px', fontWeight: 'bold' },
+            title: a.name,
+          });
+          marker.addListener('click', () =>
+            open(marker, `<b>${a.name}</b><br/>${a.qrId} • ${a.zoneName}<br/>Status: ${a.status}<br/>${a.location}`),
+          );
+          overlaysRef.current.push(marker);
         });
-        marker.addListener('click', () =>
-          open(
-            marker,
-            `<b>${s.name}</b><br/>${s.zoneName}<br/>Occupancy: ${s.currentOccupancy}/${s.capacity}<br/>Status: ${s.status}`,
-          ),
-        );
-        overlaysRef.current.push(marker);
-      });
-    }
+      }
 
-    if (showAssets) {
-      assets.forEach((a) => {
-        const color = a.status === 'ready' ? '#2E9CCA' : a.status === 'critical' ? '#E4572E' : '#F2B138';
-        const marker = new google.maps.Marker({
-          map,
-          position: { lat: a.coordinates[0], lng: a.coordinates[1] },
-          icon: pin(color, 'A'),
-          label: { text: 'A', color: '#fff', fontSize: '10px', fontWeight: 'bold' },
-          title: a.name,
+      if (showFloodHotspots) {
+        FLOOD_HOTSPOTS.forEach((hs) => {
+          const circle = new google.maps.Circle({
+            map,
+            center: { lat: hs.lat, lng: hs.lng },
+            radius: hs.radius,
+            strokeColor: '#E4572E',
+            strokeOpacity: 0.9,
+            strokeWeight: 1.5,
+            fillColor: '#E4572E',
+            fillOpacity: 0.22,
+          });
+          circle.addListener('click', () => {
+            infoRef.current.setContent(
+              `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>⚠️ FLOOD HOTSPOT</b><br/>${hs.name}<br/>Severity: ${hs.severity}</div>`,
+            );
+            infoRef.current.setPosition({ lat: hs.lat, lng: hs.lng });
+            infoRef.current.open(map);
+          });
+          overlaysRef.current.push(circle);
         });
-        marker.addListener('click', () =>
-          open(marker, `<b>${a.name}</b><br/>${a.qrId} • ${a.zoneName}<br/>Status: ${a.status}<br/>${a.location}`),
-        );
-        overlaysRef.current.push(marker);
-      });
-    }
+      }
+    } else if (engine === 'leaflet' && leafletMapRef.current) {
+      const map = leafletMapRef.current;
+      leafletLayersRef.current.forEach((l) => l.remove());
+      leafletLayersRef.current = [];
 
-    if (showFloodHotspots) {
-      FLOOD_HOTSPOTS.forEach((hs) => {
-        const circle = new google.maps.Circle({
-          map,
-          center: { lat: hs.lat, lng: hs.lng },
-          radius: hs.radius,
-          strokeColor: '#E4572E',
-          strokeOpacity: 0.9,
-          strokeWeight: 1.5,
-          fillColor: '#E4572E',
-          fillOpacity: 0.22,
+      if (showZones) {
+        zones.forEach((z) => {
+          const color = z.status === 'ready' ? '#2FBF71' : z.status === 'pending' ? '#F2B138' : '#E4572E';
+          const marker = L.circleMarker([z.coordinates[0], z.coordinates[1]], {
+            radius: 12,
+            fillColor: color,
+            color: '#ffffff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9,
+          });
+          marker.bindTooltip(`<b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%`, {
+            direction: 'top',
+          });
+          marker.bindPopup(
+            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%<br/>Pending tasks: ${z.pendingTaskCount}<br/>Officer: ${z.officerName}</div>`,
+          );
+          marker.addTo(map);
+          leafletLayersRef.current.push(marker);
         });
-        circle.addListener('click', () => {
-          infoRef.current.setContent(
+      }
+
+      if (showShelters) {
+        shelters.forEach((s) => {
+          const marker = L.circleMarker([s.coordinates[0], s.coordinates[1]], {
+            radius: 9,
+            fillColor: '#2FBF71',
+            color: '#ffffff',
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 0.9,
+          });
+          marker.bindTooltip(`<b>Shelter: ${s.name}</b><br/>Capacity: ${s.capacity}`, { direction: 'top' });
+          marker.bindPopup(
+            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>${s.name}</b><br/>${s.zoneName}<br/>Occupancy: ${s.currentOccupancy}/${s.capacity}<br/>Status: ${s.status}</div>`,
+          );
+          marker.addTo(map);
+          leafletLayersRef.current.push(marker);
+        });
+      }
+
+      if (showAssets) {
+        assets.forEach((a) => {
+          const color = a.status === 'ready' ? '#2E9CCA' : a.status === 'critical' ? '#E4572E' : '#F2B138';
+          const marker = L.circleMarker([a.coordinates[0], a.coordinates[1]], {
+            radius: 8,
+            fillColor: color,
+            color: '#ffffff',
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 0.9,
+          });
+          marker.bindTooltip(`<b>${a.name}</b><br/>${a.status}`, { direction: 'top' });
+          marker.bindPopup(
+            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>${a.name}</b><br/>${a.qrId} • ${a.zoneName}<br/>Status: ${a.status}<br/>${a.location}</div>`,
+          );
+          marker.addTo(map);
+          leafletLayersRef.current.push(marker);
+        });
+      }
+
+      if (showFloodHotspots) {
+        FLOOD_HOTSPOTS.forEach((hs) => {
+          const circle = L.circle([hs.lat, hs.lng], {
+            radius: hs.radius,
+            color: '#E4572E',
+            fillColor: '#E4572E',
+            fillOpacity: 0.25,
+            weight: 2,
+            dashArray: '4, 4',
+          });
+          circle.bindPopup(
             `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>⚠️ FLOOD HOTSPOT</b><br/>${hs.name}<br/>Severity: ${hs.severity}</div>`,
           );
-          infoRef.current.setPosition({ lat: hs.lat, lng: hs.lng });
-          infoRef.current.open(map);
+          circle.addTo(map);
+          leafletLayersRef.current.push(circle);
         });
-        overlaysRef.current.push(circle);
-      });
+      }
     }
-  }, [ready, zones, shelters, assets, showZones, showShelters, showAssets, showFloodHotspots, navigateTo]);
+  }, [ready, engine, zones, shelters, assets, showZones, showShelters, showAssets, showFloodHotspots, navigateTo]);
 
   return (
     <div className="p-4 md:p-6 space-y-4 h-[calc(100vh-80px)] flex flex-col">
@@ -228,9 +362,10 @@ export const MapView: React.FC = () => {
             <MapPin className="w-5 h-5 text-[#2E9CCA]" />
             <span>Interactive Tactical Map — Greater Visakhapatnam</span>
           </h1>
-          <p className="text-xs text-slate-400 font-mono">
-            Google Maps live view of {zones.length} zones, cyclone shelters, critical assets & coastal
-            vulnerability hotspots
+          <p className="text-xs text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
+            <Globe className="w-3.5 h-3.5 text-[#2E9CCA]" />
+            <span>{engine === 'google' ? 'Google Maps Tactical Engine' : 'Tactical Basemap (Leaflet / Dark Matter)'}</span>
+            <span>• {zones.length} zones, cyclone shelters, critical assets & coastal hotspots</span>
           </p>
         </div>
 
@@ -266,10 +401,11 @@ export const MapView: React.FC = () => {
         <div ref={containerRef} className="w-full h-full" />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-slate-400 bg-[#0B1220]/80">
-            {mapError ? `Map unavailable: ${mapError}` : 'Initialising Google tactical basemap…'}
+            {mapError ? `Map status: ${mapError}` : 'Initialising tactical basemap…'}
           </div>
         )}
       </div>
     </div>
   );
 };
+
