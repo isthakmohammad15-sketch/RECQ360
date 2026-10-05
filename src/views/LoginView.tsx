@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { ROLE_OPTIONS, type AppRole } from '../lib/roles';
+import { ROLE_OPTIONS, type AppRole, getBoundRoleForEmail, bindRoleToEmail, roleLabel } from '../lib/roles';
 import { ShieldCheck, Radio, ArrowRight, Loader2, Lock, ArrowLeft } from 'lucide-react';
 
 const GOOGLE_CLIENT_ID =
@@ -102,10 +102,25 @@ export const LoginView: React.FC = () => {
             const profile = await res.json();
 
             if (profile?.email) {
-              const role =
+              const normalizedEmail = profile.email.toLowerCase().trim();
+              const boundRole = getBoundRoleForEmail(normalizedEmail);
+              const requestedRole =
                 roleRef.current ||
                 (window.localStorage.getItem('cyclone360.selectedRole') as AppRole | null) ||
                 'commissioner';
+
+              // Security Rule: One email = Only ONE Officer Role. Cannot switch to another role.
+              if (boundRole && boundRole !== requestedRole) {
+                setAuthError(
+                  `Role Access Denied: The account "${profile.email}" is permanently registered as "${roleLabel(boundRole)}". One account cannot be used with a different role. Please choose "${roleLabel(boundRole)}" from the dropdown to continue.`,
+                );
+                setBusy(false);
+                return;
+              }
+
+              if (!boundRole) {
+                bindRoleToEmail(normalizedEmail, requestedRole);
+              }
 
               loginWithGoogleProfile(
                 {
@@ -113,7 +128,7 @@ export const LoginView: React.FC = () => {
                   name: profile.name || profile.given_name || profile.email,
                   avatarUrl: profile.picture,
                 },
-                role,
+                boundRole || requestedRole,
               );
             } else {
               throw new Error('Google did not provide an email address.');

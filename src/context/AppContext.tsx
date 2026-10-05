@@ -25,7 +25,7 @@ import {
   mapDeptStat,
   mapContact,
 } from '../lib/mappers';
-import { type AppRole, toUiRole, roleLabel, EDITOR_ROLES } from '../lib/roles';
+import { type AppRole, toUiRole, roleLabel, EDITOR_ROLES, getBoundRoleForEmail, bindRoleToEmail } from '../lib/roles';
 import { permissionsFor, type Permissions } from '../lib/permissions';
 import {
   INITIAL_ZONES,
@@ -766,12 +766,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginWithGoogleProfile = useCallback(
     (profile: { email: string; name: string; avatarUrl?: string }, role: AppRole) => {
+      const boundRole = getBoundRoleForEmail(profile.email);
+      const effectiveRole = boundRole || role;
+      if (!boundRole) {
+        bindRoleToEmail(profile.email, role);
+      }
       const user: User = {
         id: `google-${profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
         name: profile.name || profile.email,
-        role: toUiRole(role),
+        role: toUiRole(effectiveRole),
         email: profile.email,
-        title: roleLabel(role),
+        title: roleLabel(effectiveRole),
         avatar:
           profile.avatarUrl ||
           (profile.name || profile.email)
@@ -784,12 +789,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (typeof window !== 'undefined') {
         localStorage.removeItem('recq360_signed_out');
         localStorage.setItem('recq360_user', JSON.stringify(user));
-        localStorage.setItem('cyclone360.selectedRole', role);
+        localStorage.setItem('cyclone360.selectedRole', effectiveRole);
       }
-      setAppRole(role);
+      setAppRole(effectiveRole);
       setCurrentUser(user);
       setIsAuthenticated(true);
-      setActiveTab(permissionsFor(role).defaultTab);
+      setActiveTab(permissionsFor(effectiveRole).defaultTab);
     },
     [],
   );

@@ -165,3 +165,9 @@ html, body { background-color: #0b1220; }
 ::-webkit-scrollbar-track { background: #0b1220; }
 ::-webkit-scrollbar-thumb { background: #1e2f4a; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #2e9cca; }
+
+/* Leaflet tactical marker styling: prevent default white box */
+.leaflet-div-icon.recq-tactical-marker {
+  background: transparent !important;
+  border: none !important;
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   MapPin,
@@ -80,7 +80,7 @@ export const MapView: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
   const tileLayersRef = useRef<L.Layer[]>([]);
-  const overlaysRef = useRef<L.Layer[]>([]);
+  const overlaysGroupRef = useRef<L.LayerGroup | null>(null);
 
   const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'streets'>('dark');
   const [ready, setReady] = useState<boolean>(false);
@@ -92,6 +92,23 @@ export const MapView: React.FC = () => {
   const [showAssets, setShowAssets] = useState<boolean>(true);
   const [showFloodHotspots, setShowFloodHotspots] = useState<boolean>(true);
 
+  // Fallback to active city's own dataset if available, otherwise global context
+  const currentZones = useMemo(() => {
+    return (activeCity?.zones && activeCity.zones.length > 0) ? activeCity.zones : zones;
+  }, [activeCity, zones]);
+
+  const currentShelters = useMemo(() => {
+    return (activeCity?.shelters && activeCity.shelters.length > 0) ? activeCity.shelters : shelters;
+  }, [activeCity, shelters]);
+
+  const currentAssets = useMemo(() => {
+    return (activeCity?.assets && activeCity.assets.length > 0) ? activeCity.assets : assets;
+  }, [activeCity, assets]);
+
+  const currentHotspots = useMemo(() => {
+    return (activeCity?.hotspots && activeCity.hotspots.length > 0) ? activeCity.hotspots : FLOOD_HOTSPOTS;
+  }, [activeCity]);
+
   // Expose global navigation handler for popup buttons
   useEffect(() => {
     (window as any).__navZone = (zoneId: string) => navigateTo('zone-detail', { zoneId });
@@ -100,16 +117,12 @@ export const MapView: React.FC = () => {
     };
   }, [navigateTo]);
 
-  // Initialize Tactical GIS Engine with Leaflet
-  const initTacticalMap = useCallback(() => {
+  // 1. Initialize Tactical GIS Engine with Leaflet ONCE on mount
+  useEffect(() => {
     if (!containerRef.current) return;
-    try {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-      }
-      containerRef.current.innerHTML = '';
+    if (leafletMapRef.current) return;
 
+    try {
       const center = activeCity?.center || DEFAULT_CENTER;
       const zoom = activeCity?.zoom || 12;
 
@@ -120,66 +133,82 @@ export const MapView: React.FC = () => {
         attributionControl: false,
       });
 
-      // Clear any prior tiles
-      tileLayersRef.current = [];
-
-      if (basemap === 'satellite') {
-        const satLayer = L.tileLayer(ESRI_SATELLITE, {
-          maxZoom: 18,
-          attribution: 'Esri World Imagery',
-        }).addTo(map);
-        tileLayersRef.current = [satLayer];
-      } else if (basemap === 'streets') {
-        const osmLayer = L.tileLayer(OSM_STREETS, {
-          maxZoom: 19,
-          attribution: 'OpenStreetMap',
-        }).addTo(map);
-        tileLayersRef.current = [osmLayer];
-      } else {
-        // High-contrast Dark Canvas
-        const darkBase = L.tileLayer(ESRI_DARK_BASE, {
-          maxZoom: 16,
-          attribution: 'Esri Canvas Dark',
-        }).addTo(map);
-        const darkRef = L.tileLayer(ESRI_DARK_REF, {
-          maxZoom: 16,
-        }).addTo(map);
-        tileLayersRef.current = [darkBase, darkRef];
-      }
+      // Create dedicated overlay layer group
+      const overlayGroup = L.layerGroup().addTo(map);
+      overlaysGroupRef.current = overlayGroup;
 
       leafletMapRef.current = map;
       setReady(true);
       setMapError('');
 
-      setTimeout(() => {
+      // Invalidate size once layout stabilizes
+      const timer = setTimeout(() => {
         map.invalidateSize();
-      }, 150);
+      }, 200);
+
+      return () => {
+        clearTimeout(timer);
+        map.remove();
+        leafletMapRef.current = null;
+        overlaysGroupRef.current = null;
+      };
     } catch (err: any) {
       console.error('[Tactical Map] Error initializing Leaflet:', err);
       setMapError(err.message || 'Failed to initialize Tactical GIS engine.');
     }
-  }, [basemap, activeCity]);
+  }, []);
 
-  // Initial load
+  // 2. Manage Basemap Tiles (Swaps layers cleanly WITHOUT destroying the map)
   useEffect(() => {
-    initTacticalMap();
-    return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-      }
-    };
-  }, [initTacticalMap]);
+    if (!leafletMapRef.current || !ready) return;
+    const map = leafletMapRef.current;
 
-  // Re-center map smoothly whenever active city changes
+    // Remove old tile layers
+    tileLayersRef.current.forEach((layer) => layer.remove());
+    tileLayersRef.current = [];
+
+    if (basemap === 'satellite') {
+      const satLayer = L.tileLayer(ESRI_SATELLITE, {
+        maxZoom: 18,
+        attribution: 'Esri World Imagery',
+      }).addTo(map);
+      tileLayersRef.current = [satLayer];
+    } else if (basemap === 'streets') {
+      const osmLayer = L.tileLayer(OSM_STREETS, {
+        maxZoom: 19,
+        attribution: 'OpenStreetMap',
+      }).addTo(map);
+      tileLayersRef.current = [osmLayer];
+    } else {
+      // High-contrast Dark Canvas
+      const darkBase = L.tileLayer(ESRI_DARK_BASE, {
+        maxZoom: 16,
+        attribution: 'Esri Canvas Dark',
+      }).addTo(map);
+      const darkRef = L.tileLayer(ESRI_DARK_REF, {
+        maxZoom: 16,
+      }).addTo(map);
+      tileLayersRef.current = [darkBase, darkRef];
+    }
+  }, [basemap, ready]);
+
+  // 3. Smoothly pan/fly whenever active city changes
   useEffect(() => {
     if (!ready || !leafletMapRef.current || !activeCity) return;
+    const map = leafletMapRef.current;
     const center = activeCity.center || DEFAULT_CENTER;
     const zoom = activeCity.zoom || 12;
-    leafletMapRef.current.flyTo([center.lat, center.lng], zoom, {
-      duration: 1.2,
-      easeLinearity: 0.25,
+
+    map.flyTo([center.lat, center.lng], zoom, {
+      duration: 0.9,
+      easeLinearity: 0.3,
     });
+
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [activeCity, ready]);
 
   // Manual recenter
@@ -187,24 +216,31 @@ export const MapView: React.FC = () => {
     if (!leafletMapRef.current || !activeCity) return;
     const center = activeCity.center || DEFAULT_CENTER;
     const zoom = activeCity.zoom || 12;
-    leafletMapRef.current.flyTo([center.lat, center.lng], zoom, { duration: 0.8 });
+    leafletMapRef.current.flyTo([center.lat, center.lng], zoom, { duration: 0.7 });
+    setTimeout(() => {
+      leafletMapRef.current?.invalidateSize();
+    }, 200);
   };
 
-  // Re-draw overlay markers (Zones, Shelters, Assets, Flood Hotspots)
+  // 4. Update overlay markers (Zones, Shelters, Assets, Flood Hotspots)
   useEffect(() => {
-    if (!ready || !leafletMapRef.current) return;
-    const map = leafletMapRef.current;
+    if (!ready || !leafletMapRef.current || !overlaysGroupRef.current) return;
+    const group = overlaysGroupRef.current;
 
-    // Clear prior overlays
-    overlaysRef.current.forEach((layer) => layer.remove());
-    overlaysRef.current = [];
+    // Clear prior overlays smoothly
+    group.clearLayers();
 
     // 1. ZONES
-    if (showZones) {
-      zones.forEach((z) => {
+    if (showZones && currentZones.length > 0) {
+      currentZones.forEach((z) => {
+        if (!z.coordinates || z.coordinates.length < 2) return;
+        const lat = Number(z.coordinates[0]);
+        const lng = Number(z.coordinates[1]);
+        if (isNaN(lat) || isNaN(lng)) return;
+
         const color = z.status === 'ready' ? '#2FBF71' : z.status === 'pending' ? '#F2B138' : '#E4572E';
         const icon = createTacticalDivIcon(color, z.number, 28);
-        const marker = L.marker([z.coordinates[0], z.coordinates[1]], { icon });
+        const marker = L.marker([lat, lng], { icon });
 
         marker.bindTooltip(`<b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%`, {
           direction: 'top',
@@ -241,16 +277,20 @@ export const MapView: React.FC = () => {
           </div>
         `);
 
-        marker.addTo(map);
-        overlaysRef.current.push(marker);
+        group.addLayer(marker);
       });
     }
 
     // 2. CYCLONE SHELTERS
-    if (showShelters) {
-      shelters.forEach((s) => {
+    if (showShelters && currentShelters.length > 0) {
+      currentShelters.forEach((s) => {
+        if (!s.coordinates || s.coordinates.length < 2) return;
+        const lat = Number(s.coordinates[0]);
+        const lng = Number(s.coordinates[1]);
+        if (isNaN(lat) || isNaN(lng)) return;
+
         const icon = createTacticalDivIcon('#2FBF71', 'S', 24);
-        const marker = L.marker([s.coordinates[0], s.coordinates[1]], { icon });
+        const marker = L.marker([lat, lng], { icon });
 
         marker.bindTooltip(`<b>Shelter: ${s.name}</b><br/>Capacity: ${s.capacity}`, { direction: 'top' });
 
@@ -264,17 +304,21 @@ export const MapView: React.FC = () => {
           </div>
         `);
 
-        marker.addTo(map);
-        overlaysRef.current.push(marker);
+        group.addLayer(marker);
       });
     }
 
     // 3. CRITICAL ASSETS
-    if (showAssets) {
-      assets.forEach((a) => {
+    if (showAssets && currentAssets.length > 0) {
+      currentAssets.forEach((a) => {
+        if (!a.coordinates || a.coordinates.length < 2) return;
+        const lat = Number(a.coordinates[0]);
+        const lng = Number(a.coordinates[1]);
+        if (isNaN(lat) || isNaN(lng)) return;
+
         const color = a.status === 'ready' ? '#2E9CCA' : a.status === 'critical' ? '#E4572E' : '#F2B138';
         const icon = createTacticalDivIcon(color, 'A', 22);
-        const marker = L.marker([a.coordinates[0], a.coordinates[1]], { icon });
+        const marker = L.marker([lat, lng], { icon });
 
         marker.bindTooltip(`<b>${a.name}</b><br/>Status: ${a.status.toUpperCase()}`, { direction: 'top' });
 
@@ -288,19 +332,19 @@ export const MapView: React.FC = () => {
           </div>
         `);
 
-        marker.addTo(map);
-        overlaysRef.current.push(marker);
+        group.addLayer(marker);
       });
     }
 
     // 4. FLOOD HOTSPOTS
-    const activeHotspots =
-      activeCity?.hotspots && activeCity.hotspots.length > 0 ? activeCity.hotspots : FLOOD_HOTSPOTS;
+    if (showFloodHotspots && currentHotspots.length > 0) {
+      currentHotspots.forEach((hs) => {
+        const lat = Number(hs.lat);
+        const lng = Number(hs.lng);
+        if (isNaN(lat) || isNaN(lng)) return;
 
-    if (showFloodHotspots) {
-      activeHotspots.forEach((hs) => {
-        const circle = L.circle([hs.lat, hs.lng], {
-          radius: hs.radius,
+        const circle = L.circle([lat, lng], {
+          radius: hs.radius || 600,
           color: '#E4572E',
           fillColor: '#E4572E',
           fillOpacity: 0.22,
@@ -313,15 +357,24 @@ export const MapView: React.FC = () => {
             <b style="color:#E4572E;font-size:12px;">⚠️ FLOOD HOTSPOT AREA</b><br/>
             <b>${hs.name}</b><br/>
             <span style="color:#64748b;">Severity Threat:</span> <b>${hs.severity}</b><br/>
-            <span style="color:#64748b;">Buffer Radius:</span> ${hs.radius} meters
+            <span style="color:#64748b;">Buffer Radius:</span> ${hs.radius || 600} meters
           </div>
         `);
 
-        circle.addTo(map);
-        overlaysRef.current.push(circle);
+        group.addLayer(circle);
       });
     }
-  }, [ready, zones, shelters, assets, showZones, showShelters, showAssets, showFloodHotspots, activeCity]);
+  }, [
+    ready,
+    currentZones,
+    currentShelters,
+    currentAssets,
+    currentHotspots,
+    showZones,
+    showShelters,
+    showAssets,
+    showFloodHotspots,
+  ]);
 
   return (
     <div className="p-4 md:p-6 space-y-4 h-[calc(100vh-80px)] flex flex-col">
@@ -344,7 +397,7 @@ export const MapView: React.FC = () => {
             <span className="text-slate-300">{activeCity?.primaryHazard || 'Multi-Hazard Grid'}</span>
             <span>•</span>
             <span>
-              {zones.length} zones, {shelters.length} shelters, {assets.length} assets
+              {currentZones.length} zones, {currentShelters.length} shelters, {currentAssets.length} assets
             </span>
           </p>
         </div>
@@ -422,37 +475,37 @@ export const MapView: React.FC = () => {
             onClick={() => setShowZones(!showZones)}
             className={`px-2.5 py-1.5 rounded border transition-all ${
               showZones
-                ? 'bg-[#2E9CCA]/20 border-[#2E9CCA] text-[#2E9CCA] font-bold'
+                ? 'bg-[#2E9CCA]/20 border-[#2E9CCA] text-[#2E9CCA] font-bold shadow'
                 : 'bg-[#0B1220] border-white/10 text-slate-400'
             }`}
           >
-            Zones ({zones.length})
+            Zones ({currentZones.length})
           </button>
           <button
             onClick={() => setShowShelters(!showShelters)}
             className={`px-2.5 py-1.5 rounded border transition-all ${
               showShelters
-                ? 'bg-[#2FBF71]/20 border-[#2FBF71] text-[#2FBF71] font-bold'
+                ? 'bg-[#2FBF71]/20 border-[#2FBF71] text-[#2FBF71] font-bold shadow'
                 : 'bg-[#0B1220] border-white/10 text-slate-400'
             }`}
           >
-            Shelters ({shelters.length})
+            Shelters ({currentShelters.length})
           </button>
           <button
             onClick={() => setShowAssets(!showAssets)}
             className={`px-2.5 py-1.5 rounded border transition-all ${
               showAssets
-                ? 'bg-[#F2B138]/20 border-[#F2B138] text-[#F2B138] font-bold'
+                ? 'bg-[#F2B138]/20 border-[#F2B138] text-[#F2B138] font-bold shadow'
                 : 'bg-[#0B1220] border-white/10 text-slate-400'
             }`}
           >
-            Assets ({assets.length})
+            Assets ({currentAssets.length})
           </button>
           <button
             onClick={() => setShowFloodHotspots(!showFloodHotspots)}
             className={`px-2.5 py-1.5 rounded border transition-all ${
               showFloodHotspots
-                ? 'bg-[#E4572E]/20 border-[#E4572E] text-[#E4572E] font-bold'
+                ? 'bg-[#E4572E]/20 border-[#E4572E] text-[#E4572E] font-bold shadow'
                 : 'bg-[#0B1220] border-white/10 text-slate-400'
             }`}
           >

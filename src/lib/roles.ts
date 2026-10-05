@@ -60,3 +60,29 @@ export function toUiRole(role: AppRole): UserRole {
 export function roleLabel(role: AppRole): string {
   return ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role;
 }
+
+const EMAIL_ROLE_REGISTRY_KEY = 'recq360_bound_email_roles';
+
+export function getBoundRoleForEmail(email: string): AppRole | null {
+  if (typeof window === 'undefined' || !email) return null;
+  try {
+    const raw = localStorage.getItem(EMAIL_ROLE_REGISTRY_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    return (map[email.toLowerCase().trim()] as AppRole) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function bindRoleToEmail(email: string, role: AppRole): void {
+  if (typeof window === 'undefined' || !email) return;
+  try {
+    const raw = localStorage.getItem(EMAIL_ROLE_REGISTRY_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[email.toLowerCase().trim()] = role;
+    localStorage.setItem(EMAIL_ROLE_REGISTRY_KEY, JSON.stringify(map));
+  } catch (e) {
+    console.warn('[Role Lock] Failed to save bound role:', e);
+  }
+}
