@@ -12,6 +12,7 @@ import {
   Building2,
   Terminal,
 } from 'lucide-react';
+import { askGemini, askGeminiSummary } from '../lib/gemini.client';
 
 export const AiAssistantView: React.FC = () => {
   const { zones, alerts, overallReadiness, canEdit } = useApp();
@@ -49,17 +50,12 @@ How can I assist your operational command today?`,
   const fetchSummary = async () => {
     setIsLoadingSummary(true);
     try {
-      const res = await fetch('/api/ai/summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zoneData: zones.map((z) => ({ name: z.name, score: z.readinessScore, status: z.status })),
-          alertData: alerts.filter((a) => !a.resolved).map((a) => ({ title: a.title, zone: a.zoneName })),
-          overallReadiness,
-        }),
+      const summary = await askGeminiSummary({
+        zoneData: zones.map((z) => ({ name: z.name, score: z.readinessScore, status: z.status })),
+        alertData: alerts.filter((a) => !a.resolved).map((a) => ({ title: a.title, zone: a.zoneName })),
+        overallReadiness,
       });
-      const data = await res.json();
-      setSummaryText(data.summary || 'Summary unavailable.');
+      setSummaryText(summary);
     } catch (err) {
       console.error('Failed to fetch summary:', err);
       setSummaryText(
@@ -90,26 +86,20 @@ How can I assist your operational command today?`,
     setIsSending(true);
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          history: messages,
-          readOnly: !canEdit,
-          stateContext: {
-            overallReadiness,
-            zones: zones.map((z) => ({ id: z.id, name: z.name, score: z.readinessScore, status: z.status })),
-            criticalAlerts: alerts.filter((a) => !a.resolved && a.severity === 'critical'),
-          },
-        }),
-      });
+      const answer = await askGemini(
+        query,
+        {
+          overallReadiness,
+          zones: zones.map((z) => ({ id: z.id, name: z.name, score: z.readinessScore, status: z.status })),
+          criticalAlerts: alerts.filter((a) => !a.resolved && a.severity === 'critical'),
+        },
+        messages,
+      );
 
-      const data = await res.json();
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: data.text || 'Understood. Processing command.',
+        text: answer || 'Understood. Operational dispatch logged.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 

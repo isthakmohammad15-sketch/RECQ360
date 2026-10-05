@@ -25,7 +25,8 @@ export function getAiProviderAndModel() {
   const geminiKey =
     process.env["GEMINI_API_KEY"] ||
     process.env["GOOGLE_GENERATIVE_AI_API_KEY"] ||
-    process.env["GOOGLE_API_KEY"];
+    process.env["GOOGLE_API_KEY"] ||
+    "AQ.Ab8RN6K37VuXMhBrmMhbWcxM67hqH-GAR_vKBvrjv3u4FDPbiQ";
   const openaiKey = process.env["OPENAI_API_KEY"];
   const openrouterKey = process.env["OPENROUTER_API_KEY"];
 
@@ -44,7 +45,7 @@ export function getAiProviderAndModel() {
       apiKey: geminiKey,
     });
     return {
-      model: provider(process.env["AI_MODEL"] || "gemini-flash-latest"),
+      model: provider(process.env["AI_MODEL"] || "gemini-3.8-flash"),
       providerName: "gemini",
     };
   }

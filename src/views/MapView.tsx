@@ -139,6 +139,9 @@ export const MapView: React.FC = () => {
         leafletMapRef.current = map;
         setEngine('leaflet');
         setReady(true);
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 150);
       } catch (err: any) {
         setMapError(err.message || 'Failed to initialise tactical basemap');
       }
@@ -397,8 +400,8 @@ export const MapView: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 bg-[#0B1220] border border-white/10 rounded-lg overflow-hidden shadow-2xl relative">
-        <div ref={containerRef} className="w-full h-full" />
+      <div className="flex-1 bg-[#0B1220] border border-white/10 rounded-lg overflow-hidden shadow-2xl relative min-h-[520px]">
+        <div ref={containerRef} className="w-full h-full min-h-[520px]" style={{ minHeight: '520px' }} />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-slate-400 bg-[#0B1220]/80">
             {mapError ? `Map status: ${mapError}` : 'Initialising tactical basemap…'}
