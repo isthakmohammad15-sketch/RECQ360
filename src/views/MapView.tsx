@@ -1,6 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { MapPin, Globe } from 'lucide-react';
+import {
+  MapPin,
+  Globe,
+  Key,
+  Layers,
+  Satellite,
+  ShieldAlert,
+  Check,
+  X,
+  ExternalLink,
+  RefreshCw,
+  AlertTriangle,
+  Compass,
+} from 'lucide-react';
 import { getMapsBrowserKey } from '../lib/maps.functions';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -9,6 +22,7 @@ declare global {
   interface Window {
     google: any;
     __initRECQ360Map?: () => void;
+    gm_authFailure?: () => void;
   }
 }
 
@@ -20,7 +34,7 @@ function isGoogleOAuthClientId(key: string): boolean {
 
 function isValidGoogleMapsKey(key: string): boolean {
   if (!key || isGoogleOAuthClientId(key)) return false;
-  return key.startsWith('AIzaSy') || key.length >= 35;
+  return key.startsWith('AIzaSy') || key.length >= 30;
 }
 
 const FLOOD_HOTSPOTS = [
@@ -41,60 +55,87 @@ const DARK_STYLE = [
   { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#1e2f4a' }] },
 ];
 
-async function loadGoogleMaps(): Promise<any> {
-  if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
-  if (window.google?.maps) return window.google;
+// Esri and OpenStreetMap layers (100% Free, zero API key required, zero watermarks)
+const ESRI_DARK_BASE =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const ESRI_DARK_REF =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
+const ESRI_SATELLITE =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const OSM_STREETS = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-  let key: string =
-    import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] ||
-    import.meta.env['VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY'] ||
-    '';
+async function loadGoogleMapsScript(customKey?: string): Promise<any> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
+  if (window.google?.maps && !customKey) return window.google;
+
+  let key: string = customKey || '';
   if (!key) {
-    try {
-      const res = await getMapsBrowserKey();
-      key = res?.key ?? '';
-    } catch {
-      key = '';
-    }
+    const res = await getMapsBrowserKey();
+    key = res?.key ?? '';
   }
 
-  if (!isValidGoogleMapsKey(key)) {
-    return Promise.reject(
-      new Error(
-        isGoogleOAuthClientId(key)
-          ? 'Provided key is a Google OAuth Client ID, using tactical Leaflet engine.'
-          : 'No Google Maps key found, using tactical Leaflet engine.',
-      ),
-    );
+  // If the key is an OAuth client ID, do not pass it as a Maps API key to avoid crash
+  if (isGoogleOAuthClientId(key)) {
+    console.warn('[Google Maps] Detected OAuth Client ID instead of Maps API Key. Proceeding without key param.');
+    key = '';
   }
 
   return new Promise((resolve, reject) => {
+    // If existing script loaded, resolve
+    if (window.google?.maps && !customKey) {
+      return resolve(window.google);
+    }
+
     const existing = document.getElementById('gmaps-sdk');
-    const channel = import.meta.env['VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID'] ?? '';
+    if (existing) {
+      existing.remove();
+    }
 
-    window.__initRECQ360Map = () => resolve(window.google);
-
-    if (existing) return;
+    window.__initRECQ360Map = () => {
+      if (window.google?.maps) {
+        resolve(window.google);
+      } else {
+        reject(new Error('Google Maps script finished but object is not available'));
+      }
+    };
 
     const script = document.createElement('script');
     script.id = 'gmaps-sdk';
     script.async = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&callback=__initRECQ360Map&channel=${channel}`;
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+
+    const url = new URL('https://maps.googleapis.com/maps/api/js');
+    if (key && !isGoogleOAuthClientId(key)) {
+      url.searchParams.set('key', key);
+    }
+    url.searchParams.set('loading', 'async');
+    url.searchParams.set('callback', '__initRECQ360Map');
+    url.searchParams.set('libraries', 'places,geometry');
+    url.searchParams.set('v', 'weekly');
+
+    script.src = url.toString();
+    script.onerror = () => reject(new Error('Failed to load Google Maps script from Google servers.'));
     document.head.appendChild(script);
+
+    // Timeout safety fallback
+    setTimeout(() => {
+      if (window.google?.maps) {
+        resolve(window.google);
+      }
+    }, 4500);
   });
 }
 
-const pin = (color: string, label: string) => ({
-  path: 'M 0,0 m -11,0 a 11,11 0 1,0 22,0 a 11,11 0 1,0 -22,0',
-  fillColor: color,
-  fillOpacity: 1,
-  strokeColor: '#ffffff',
-  strokeWeight: 2,
-  scale: 1,
-  labelOrigin: { x: 0, y: 0 },
-  label,
-});
+const makeSvgMarker = (color: string, label: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <circle cx="15" cy="15" r="13" fill="${color}" stroke="#ffffff" stroke-width="2.5" />
+    <text x="15" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">${label}</text>
+  </svg>`;
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new window.google.maps.Size(30, 30),
+    anchor: new window.google.maps.Point(15, 15),
+  };
+};
 
 export const MapView: React.FC = () => {
   const { zones, shelters, assets, navigateTo } = useApp();
@@ -105,78 +146,158 @@ export const MapView: React.FC = () => {
   const infoRef = useRef<any>(null);
 
   const leafletMapRef = useRef<L.Map | null>(null);
-  const leafletLayersRef = useRef<L.Layer[]>([]);
+  const leafletTileLayersRef = useRef<L.Layer[]>([]);
+  const leafletOverlaysRef = useRef<L.Layer[]>([]);
 
   const [engine, setEngine] = useState<'google' | 'leaflet'>('google');
+  const [googleTheme, setGoogleTheme] = useState<'dark' | 'natural'>('natural');
+  const [leafletLayer, setLeafletLayer] = useState<'dark' | 'satellite' | 'streets'>('dark');
   const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState<string>('');
+  const [gmapsAuthError, setGmapsAuthError] = useState<boolean>(false);
+
+  // Layer filters
   const [showZones, setShowZones] = useState(true);
   const [showShelters, setShowShelters] = useState(true);
   const [showAssets, setShowAssets] = useState(true);
   const [showFloodHotspots, setShowFloodHotspots] = useState(true);
 
-  // Boot the SDK + map instance once.
-  useEffect(() => {
-    let cancelled = false;
+  // Key configuration modal state
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [inputKey, setInputKey] = useState(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('recq360_google_maps_key') || '' : '';
+  });
+  const [keyNotice, setKeyNotice] = useState('');
 
-    const initLeaflet = () => {
-      if (cancelled || !containerRef.current) return;
-      try {
-        if (leafletMapRef.current) {
-          leafletMapRef.current.remove();
-          leafletMapRef.current = null;
-        }
-        const map = L.map(containerRef.current, {
-          center: [VIZAG_CENTER.lat, VIZAG_CENTER.lng],
-          zoom: 11,
+  // Handle Google Maps authentication failures cleanly
+  useEffect(() => {
+    window.gm_authFailure = () => {
+      console.warn('[Google Maps] gm_authFailure fired — check key restrictions or billing.');
+      setGmapsAuthError(true);
+    };
+    return () => {
+      delete window.gm_authFailure;
+    };
+  }, []);
+
+  // Initialize Leaflet Tactical Basemap (Zero-Key, No Watermarks)
+  const initLeaflet = useCallback(() => {
+    if (!containerRef.current) return;
+    try {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+      containerRef.current.innerHTML = '';
+
+      const map = L.map(containerRef.current, {
+        center: [VIZAG_CENTER.lat, VIZAG_CENTER.lng],
+        zoom: 12,
+        zoomControl: true,
+      });
+
+      // Clear any prior tile layers
+      leafletTileLayersRef.current = [];
+
+      if (leafletLayer === 'satellite') {
+        const sat = L.tileLayer(ESRI_SATELLITE, {
+          maxZoom: 18,
+          attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+        }).addTo(map);
+        leafletTileLayersRef.current = [sat];
+      } else if (leafletLayer === 'streets') {
+        const osm = L.tileLayer(OSM_STREETS, {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(map);
+        leafletTileLayersRef.current = [osm];
+      } else {
+        // Esri Dark Canvas
+        const base = L.tileLayer(ESRI_DARK_BASE, {
+          maxZoom: 16,
+          attribution: '&copy; Esri, HERE, Garmin',
+        }).addTo(map);
+        const ref = L.tileLayer(ESRI_DARK_REF, {
+          maxZoom: 16,
+          attribution: '',
+        }).addTo(map);
+        leafletTileLayersRef.current = [base, ref];
+      }
+
+      leafletMapRef.current = map;
+      setEngine('leaflet');
+      setReady(true);
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 200);
+    } catch (err: any) {
+      setMapError(err.message || 'Failed to initialize tactical map engine');
+    }
+  }, [leafletLayer]);
+
+  // Initialize Google Maps Engine
+  const initGoogleMaps = useCallback((customKey?: string) => {
+    if (!containerRef.current) return;
+    setReady(false);
+    setMapError('');
+
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+      leafletMapRef.current = null;
+    }
+    containerRef.current.innerHTML = '';
+
+    loadGoogleMapsScript(customKey)
+      .then((google) => {
+        if (!containerRef.current) return;
+        const gMap = new google.maps.Map(containerRef.current, {
+          center: VIZAG_CENTER,
+          zoom: 12,
+          styles: googleTheme === 'dark' ? DARK_STYLE : [],
+          disableDefaultUI: false,
+          mapTypeControl: true,
+          mapTypeControlOptions: {
+            position: google.maps.ControlPosition.TOP_RIGHT,
+            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+          },
+          streetViewControl: true,
+          fullscreenControl: true,
           zoomControl: true,
         });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          subdomains: 'abcd',
-          attribution: '&copy; OpenStreetMap &copy; CARTO',
-        }).addTo(map);
-        leafletMapRef.current = map;
-        setEngine('leaflet');
-        setReady(true);
-        setTimeout(() => {
-          map.invalidateSize();
-        }, 150);
-      } catch (err: any) {
-        setMapError(err.message || 'Failed to initialise tactical basemap');
-      }
-    };
 
-    loadGoogleMaps()
-      .then((google) => {
-        if (cancelled || !containerRef.current) return;
-        mapRef.current = new google.maps.Map(containerRef.current, {
-          center: VIZAG_CENTER,
-          zoom: 11,
-          styles: DARK_STYLE,
-          disableDefaultUI: false,
-          streetViewControl: false,
-          mapTypeControl: false,
-        });
         infoRef.current = new google.maps.InfoWindow();
+        mapRef.current = gMap;
         setEngine('google');
         setReady(true);
       })
       .catch((err) => {
-        console.info('[Tactical Map] Google Maps key not active, using tactical Leaflet basemap:', err.message);
+        console.warn('[Tactical Map] Google Maps script notice:', err.message);
+        setMapError(err.message);
         initLeaflet();
       });
+  }, [googleTheme, initLeaflet]);
 
+  // Initial Boot
+  useEffect(() => {
+    initGoogleMaps();
     return () => {
-      cancelled = true;
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
       }
     };
-  }, []);
+  }, [initGoogleMaps]);
 
-  // Re-draw overlays whenever data or layer toggles change.
+  // Handle switching between Dark style and Natural Google Maps style
+  useEffect(() => {
+    if (engine === 'google' && mapRef.current) {
+      mapRef.current.setOptions({
+        styles: googleTheme === 'dark' ? DARK_STYLE : [],
+      });
+    }
+  }, [googleTheme, engine]);
+
+  // Re-draw overlays whenever data or layer toggles change
   useEffect(() => {
     if (!ready) return;
 
@@ -188,7 +309,9 @@ export const MapView: React.FC = () => {
       overlaysRef.current = [];
 
       const open = (marker: any, html: string) => {
-        infoRef.current.setContent(`<div style="font-family:monospace;font-size:12px;color:#0B1220">${html}</div>`);
+        infoRef.current.setContent(
+          `<div style="font-family:system-ui,sans-serif;font-size:12px;color:#0B1220;padding:4px;max-width:260px;">${html}</div>`,
+        );
         infoRef.current.open({ anchor: marker, map });
       };
 
@@ -198,17 +321,24 @@ export const MapView: React.FC = () => {
           const marker = new google.maps.Marker({
             map,
             position: { lat: z.coordinates[0], lng: z.coordinates[1] },
-            icon: pin(color, String(z.number)),
-            label: { text: String(z.number), color: '#fff', fontSize: '10px', fontWeight: 'bold' },
-            title: z.name,
+            icon: makeSvgMarker(color, String(z.number)),
+            title: `Zone ${z.number} — ${z.name}`,
           });
+
           marker.addListener('click', () => {
             open(
               marker,
-              `<b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%<br/>Pending tasks: ${z.pendingTaskCount}<br/>Officer: ${z.officerName}`,
+              `<div style="font-weight:700;font-size:13px;margin-bottom:4px;">Zone ${z.number} — ${z.name}</div>
+               <div style="margin-bottom:3px;"><span style="color:#64748b;">Readiness:</span> <b>${z.readinessScore}%</b> (${z.status.toUpperCase()})</div>
+               <div style="margin-bottom:3px;"><span style="color:#64748b;">Pending Tasks:</span> <b>${z.pendingTaskCount}</b></div>
+               <div style="margin-bottom:6px;"><span style="color:#64748b;">Duty Officer:</span> ${z.officerName}</div>
+               <button onclick="window.__navZone && window.__navZone('${z.id}')" style="background:#2E9CCA;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;">
+                 Open Zone Detail
+               </button>`,
             );
           });
-          marker.addListener('dblclick', () => navigateTo('zone-detail', { zoneId: z.id }));
+
+          (window as any).__navZone = (zoneId: string) => navigateTo('zone-detail', { zoneId });
           overlaysRef.current.push(marker);
         });
       }
@@ -218,14 +348,17 @@ export const MapView: React.FC = () => {
           const marker = new google.maps.Marker({
             map,
             position: { lat: s.coordinates[0], lng: s.coordinates[1] },
-            icon: pin('#2FBF71', 'S'),
-            label: { text: 'S', color: '#fff', fontSize: '10px', fontWeight: 'bold' },
-            title: s.name,
+            icon: makeSvgMarker('#2FBF71', 'S'),
+            title: `Shelter: ${s.name}`,
           });
           marker.addListener('click', () =>
             open(
               marker,
-              `<b>${s.name}</b><br/>${s.zoneName}<br/>Occupancy: ${s.currentOccupancy}/${s.capacity}<br/>Status: ${s.status}`,
+              `<div style="font-weight:700;font-size:13px;margin-bottom:4px;">🏠 ${s.name}</div>
+               <div style="color:#64748b;margin-bottom:3px;">${s.zoneName}</div>
+               <div style="margin-bottom:3px;"><span style="color:#64748b;">Capacity / Occupancy:</span> <b>${s.currentOccupancy} / ${s.capacity}</b></div>
+               <div style="margin-bottom:3px;"><span style="color:#64748b;">Generator Backup:</span> <b>${s.generatorBackup ? 'Available' : 'None'}</b></div>
+               ${s.contactPhone ? `<div><span style="color:#64748b;">Contact:</span> <a href="tel:${s.contactPhone}" style="color:#2E9CCA;text-decoration:none;">${s.contactPhone}</a></div>` : ''}`,
             ),
           );
           overlaysRef.current.push(marker);
@@ -238,12 +371,18 @@ export const MapView: React.FC = () => {
           const marker = new google.maps.Marker({
             map,
             position: { lat: a.coordinates[0], lng: a.coordinates[1] },
-            icon: pin(color, 'A'),
-            label: { text: 'A', color: '#fff', fontSize: '10px', fontWeight: 'bold' },
-            title: a.name,
+            icon: makeSvgMarker(color, 'A'),
+            title: `Asset: ${a.name}`,
           });
           marker.addListener('click', () =>
-            open(marker, `<b>${a.name}</b><br/>${a.qrId} • ${a.zoneName}<br/>Status: ${a.status}<br/>${a.location}`),
+            open(
+              marker,
+              `<div style="font-weight:700;font-size:13px;margin-bottom:4px;">⚡ ${a.name}</div>
+               <div style="margin-bottom:2px;"><span style="color:#64748b;">QR ID:</span> <code>${a.qrId}</code></div>
+               <div style="margin-bottom:2px;"><span style="color:#64748b;">Zone:</span> ${a.zoneName}</div>
+               <div style="margin-bottom:2px;"><span style="color:#64748b;">Status:</span> <b>${a.status.toUpperCase()}</b></div>
+               <div><span style="color:#64748b;">Location:</span> ${a.location}</div>`,
+            ),
           );
           overlaysRef.current.push(marker);
         });
@@ -257,13 +396,18 @@ export const MapView: React.FC = () => {
             radius: hs.radius,
             strokeColor: '#E4572E',
             strokeOpacity: 0.9,
-            strokeWeight: 1.5,
+            strokeWeight: 2,
             fillColor: '#E4572E',
-            fillOpacity: 0.22,
+            fillOpacity: 0.2,
           });
           circle.addListener('click', () => {
             infoRef.current.setContent(
-              `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>⚠️ FLOOD HOTSPOT</b><br/>${hs.name}<br/>Severity: ${hs.severity}</div>`,
+              `<div style="font-family:system-ui,sans-serif;font-size:12px;color:#0B1220;padding:4px;">
+                 <b style="color:#E4572E;">⚠️ FLOOD HOTSPOT AREA</b><br/>
+                 <b>${hs.name}</b><br/>
+                 <span style="color:#64748b;">Severity Threat:</span> <b>${hs.severity}</b><br/>
+                 <span style="color:#64748b;">Zone Radius:</span> ${hs.radius} meters
+               </div>`,
             );
             infoRef.current.setPosition({ lat: hs.lat, lng: hs.lng });
             infoRef.current.open(map);
@@ -273,47 +417,57 @@ export const MapView: React.FC = () => {
       }
     } else if (engine === 'leaflet' && leafletMapRef.current) {
       const map = leafletMapRef.current;
-      leafletLayersRef.current.forEach((l) => l.remove());
-      leafletLayersRef.current = [];
+      leafletOverlaysRef.current.forEach((l) => l.remove());
+      leafletOverlaysRef.current = [];
 
       if (showZones) {
         zones.forEach((z) => {
           const color = z.status === 'ready' ? '#2FBF71' : z.status === 'pending' ? '#F2B138' : '#E4572E';
           const marker = L.circleMarker([z.coordinates[0], z.coordinates[1]], {
-            radius: 12,
+            radius: 13,
             fillColor: color,
             color: '#ffffff',
-            weight: 2,
+            weight: 2.5,
             opacity: 1,
-            fillOpacity: 0.9,
+            fillOpacity: 0.95,
           });
           marker.bindTooltip(`<b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%`, {
             direction: 'top',
           });
           marker.bindPopup(
-            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>Zone ${z.number} — ${z.name}</b><br/>Readiness: ${z.readinessScore}%<br/>Pending tasks: ${z.pendingTaskCount}<br/>Officer: ${z.officerName}</div>`,
+            `<div style="font-family:system-ui,sans-serif;font-size:12px;color:#0B1220;">
+              <b>Zone ${z.number} — ${z.name}</b><br/>
+              Readiness: <b>${z.readinessScore}%</b><br/>
+              Pending tasks: ${z.pendingTaskCount}<br/>
+              Duty Officer: ${z.officerName}
+            </div>`,
           );
           marker.addTo(map);
-          leafletLayersRef.current.push(marker);
+          leafletOverlaysRef.current.push(marker);
         });
       }
 
       if (showShelters) {
         shelters.forEach((s) => {
           const marker = L.circleMarker([s.coordinates[0], s.coordinates[1]], {
-            radius: 9,
+            radius: 10,
             fillColor: '#2FBF71',
             color: '#ffffff',
-            weight: 1.5,
+            weight: 2,
             opacity: 1,
-            fillOpacity: 0.9,
+            fillOpacity: 0.95,
           });
           marker.bindTooltip(`<b>Shelter: ${s.name}</b><br/>Capacity: ${s.capacity}`, { direction: 'top' });
           marker.bindPopup(
-            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>${s.name}</b><br/>${s.zoneName}<br/>Occupancy: ${s.currentOccupancy}/${s.capacity}<br/>Status: ${s.status}</div>`,
+            `<div style="font-family:system-ui,sans-serif;font-size:12px;color:#0B1220;">
+              <b>🏠 ${s.name}</b><br/>
+              ${s.zoneName}<br/>
+              Occupancy: <b>${s.currentOccupancy}/${s.capacity}</b><br/>
+              Status: ${s.status}
+            </div>`,
           );
           marker.addTo(map);
-          leafletLayersRef.current.push(marker);
+          leafletOverlaysRef.current.push(marker);
         });
       }
 
@@ -321,19 +475,24 @@ export const MapView: React.FC = () => {
         assets.forEach((a) => {
           const color = a.status === 'ready' ? '#2E9CCA' : a.status === 'critical' ? '#E4572E' : '#F2B138';
           const marker = L.circleMarker([a.coordinates[0], a.coordinates[1]], {
-            radius: 8,
+            radius: 9,
             fillColor: color,
             color: '#ffffff',
-            weight: 1.5,
+            weight: 2,
             opacity: 1,
-            fillOpacity: 0.9,
+            fillOpacity: 0.95,
           });
           marker.bindTooltip(`<b>${a.name}</b><br/>${a.status}`, { direction: 'top' });
           marker.bindPopup(
-            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>${a.name}</b><br/>${a.qrId} • ${a.zoneName}<br/>Status: ${a.status}<br/>${a.location}</div>`,
+            `<div style="font-family:system-ui,sans-serif;font-size:12px;color:#0B1220;">
+              <b>⚡ ${a.name}</b><br/>
+              ${a.qrId} • ${a.zoneName}<br/>
+              Status: <b>${a.status}</b><br/>
+              Location: ${a.location}
+            </div>`,
           );
           marker.addTo(map);
-          leafletLayersRef.current.push(marker);
+          leafletOverlaysRef.current.push(marker);
         });
       }
 
@@ -345,70 +504,297 @@ export const MapView: React.FC = () => {
             fillColor: '#E4572E',
             fillOpacity: 0.25,
             weight: 2,
-            dashArray: '4, 4',
+            dashArray: '5, 5',
           });
           circle.bindPopup(
-            `<div style="font-family:monospace;font-size:12px;color:#0B1220"><b>⚠️ FLOOD HOTSPOT</b><br/>${hs.name}<br/>Severity: ${hs.severity}</div>`,
+            `<div style="font-family:system-ui,sans-serif;font-size:12px;color:#0B1220;">
+              <b style="color:#E4572E;">⚠️ FLOOD HOTSPOT</b><br/>
+              <b>${hs.name}</b><br/>
+              Severity: ${hs.severity}<br/>
+              Radius: ${hs.radius}m
+            </div>`,
           );
           circle.addTo(map);
-          leafletLayersRef.current.push(circle);
+          leafletOverlaysRef.current.push(circle);
         });
       }
     }
   }, [ready, engine, zones, shelters, assets, showZones, showShelters, showAssets, showFloodHotspots, navigateTo]);
 
+  // Handle saving new Google Maps API Key
+  const handleSaveKey = () => {
+    const trimmed = inputKey.trim();
+    if (isGoogleOAuthClientId(trimmed)) {
+      setKeyNotice('Warning: This is a Google OAuth Client ID (used for login), not a Google Maps API Key. A Maps API key begins with "AIzaSy...".');
+      return;
+    }
+    if (trimmed) {
+      localStorage.setItem('recq360_google_maps_key', trimmed);
+      setKeyNotice('API Key saved successfully! Reloading Google Maps...');
+    } else {
+      localStorage.removeItem('recq360_google_maps_key');
+      setKeyNotice('Saved key cleared.');
+    }
+    setTimeout(() => {
+      setShowKeyModal(false);
+      setKeyNotice('');
+      initGoogleMaps(trimmed);
+    }, 700);
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-4 h-[calc(100vh-80px)] flex flex-col">
-      <div className="bg-[#0F1A2E] border border-white/10 rounded-lg p-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
+      {/* Top Header & Tactical Controls */}
+      <div className="bg-[#0F1A2E] border border-white/10 rounded-lg p-4 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
             <MapPin className="w-5 h-5 text-[#2E9CCA]" />
             <span>Interactive Tactical Map — Greater Visakhapatnam</span>
           </h1>
-          <p className="text-xs text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
-            <Globe className="w-3.5 h-3.5 text-[#2E9CCA]" />
-            <span>{engine === 'google' ? 'Google Maps Tactical Engine' : 'Tactical Basemap (Leaflet / Dark Matter)'}</span>
-            <span>• {zones.length} zones, cyclone shelters, critical assets & coastal hotspots</span>
+          <p className="text-xs text-slate-400 font-mono flex flex-wrap items-center gap-2 mt-0.5">
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${engine === 'google' ? 'bg-[#2FBF71] animate-ping' : 'bg-[#2E9CCA]'}`} />
+              <b className={engine === 'google' ? 'text-[#2FBF71]' : 'text-[#2E9CCA]'}>
+                {engine === 'google' ? 'Google Maps Live Engine' : 'Tactical GIS Basemap (Esri High-Contrast Dark)'}
+              </b>
+            </span>
+            <span>•</span>
+            <span>{zones.length} zones, {shelters.length} cyclone shelters, {assets.length} critical assets & coastal hotspots</span>
           </p>
         </div>
 
+        {/* Engine Switcher, Layer Controls, and Key Setting */}
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+          {/* Engine Selector */}
+          <div className="flex items-center bg-[#0B1220] border border-white/10 rounded p-0.5">
+            <button
+              onClick={() => {
+                if (engine !== 'google') {
+                  initGoogleMaps();
+                }
+              }}
+              className={`px-2.5 py-1 rounded text-xs transition-all flex items-center gap-1.5 ${
+                engine === 'google' ? 'bg-[#2E9CCA] text-[#0B1220] font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              Google Maps
+            </button>
+            <button
+              onClick={() => {
+                if (engine !== 'leaflet') {
+                  initLeaflet();
+                }
+              }}
+              className={`px-2.5 py-1 rounded text-xs transition-all flex items-center gap-1.5 ${
+                engine === 'leaflet' ? 'bg-[#2E9CCA] text-[#0B1220] font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Tactical GIS
+            </button>
+          </div>
+
+          {/* Engine Sub-Style Toggles */}
+          {engine === 'google' ? (
+            <button
+              onClick={() => setGoogleTheme((prev) => (prev === 'dark' ? 'natural' : 'dark'))}
+              className="px-2.5 py-1.5 rounded border border-white/10 bg-[#0B1220] text-slate-300 hover:text-white transition-all flex items-center gap-1"
+              title="Toggle Google Maps styling between Dark Tactical and Natural Roads"
+            >
+              <Compass className="w-3.5 h-3.5 text-[#2E9CCA]" />
+              <span>{googleTheme === 'dark' ? 'Dark Tactical' : 'Standard Google'}</span>
+            </button>
+          ) : (
+            <select
+              value={leafletLayer}
+              onChange={(e) => setLeafletLayer(e.target.value as any)}
+              className="px-2.5 py-1 rounded border border-white/10 bg-[#0B1220] text-slate-300 text-xs focus:outline-none"
+            >
+              <option value="dark">Esri Dark Canvas</option>
+              <option value="satellite">Esri Satellite</option>
+              <option value="streets">OpenStreetMap</option>
+            </select>
+          )}
+
+          {/* Layer Filter Toggles */}
           <button
             onClick={() => setShowZones(!showZones)}
-            className={`px-3 py-1.5 rounded border transition-all ${showZones ? 'bg-[#2E9CCA]/20 border-[#2E9CCA] text-[#2E9CCA]' : 'bg-[#0B1220] border-white/10 text-slate-400'}`}
+            className={`px-2.5 py-1.5 rounded border transition-all ${
+              showZones ? 'bg-[#2E9CCA]/20 border-[#2E9CCA] text-[#2E9CCA]' : 'bg-[#0B1220] border-white/10 text-slate-400'
+            }`}
           >
             Zones ({zones.length})
           </button>
           <button
             onClick={() => setShowShelters(!showShelters)}
-            className={`px-3 py-1.5 rounded border transition-all ${showShelters ? 'bg-[#2FBF71]/20 border-[#2FBF71] text-[#2FBF71]' : 'bg-[#0B1220] border-white/10 text-slate-400'}`}
+            className={`px-2.5 py-1.5 rounded border transition-all ${
+              showShelters ? 'bg-[#2FBF71]/20 border-[#2FBF71] text-[#2FBF71]' : 'bg-[#0B1220] border-white/10 text-slate-400'
+            }`}
           >
             Shelters ({shelters.length})
           </button>
           <button
             onClick={() => setShowAssets(!showAssets)}
-            className={`px-3 py-1.5 rounded border transition-all ${showAssets ? 'bg-[#F2B138]/20 border-[#F2B138] text-[#F2B138]' : 'bg-[#0B1220] border-white/10 text-slate-400'}`}
+            className={`px-2.5 py-1.5 rounded border transition-all ${
+              showAssets ? 'bg-[#F2B138]/20 border-[#F2B138] text-[#F2B138]' : 'bg-[#0B1220] border-white/10 text-slate-400'
+            }`}
           >
             Assets ({assets.length})
           </button>
           <button
             onClick={() => setShowFloodHotspots(!showFloodHotspots)}
-            className={`px-3 py-1.5 rounded border transition-all ${showFloodHotspots ? 'bg-[#E4572E]/20 border-[#E4572E] text-[#E4572E]' : 'bg-[#0B1220] border-white/10 text-slate-400'}`}
+            className={`px-2.5 py-1.5 rounded border transition-all ${
+              showFloodHotspots ? 'bg-[#E4572E]/20 border-[#E4572E] text-[#E4572E]' : 'bg-[#0B1220] border-white/10 text-slate-400'
+            }`}
           >
             Flood Hotspots
+          </button>
+
+          {/* Key Settings Button */}
+          <button
+            onClick={() => setShowKeyModal(true)}
+            className="px-2.5 py-1.5 rounded border border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA] hover:bg-[#2E9CCA]/20 transition-all flex items-center gap-1.5"
+            title="Configure Google Maps API Key"
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>Map Key</span>
           </button>
         </div>
       </div>
 
+      {/* Auth Notice Alert if Google Maps encounters key restriction */}
+      {gmapsAuthError && engine === 'google' && (
+        <div className="bg-[#E4572E]/15 border border-[#E4572E]/50 rounded-lg p-3 text-xs flex items-center justify-between gap-4 text-slate-200 shrink-0">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-[#E4572E] shrink-0" />
+            <span>
+              Google Maps Authentication Notice: Google requires a valid Maps JavaScript API Key (starts with <code>AIzaSy...</code>) for unrestricted satellite & street map tiles.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowKeyModal(true)}
+              className="px-2.5 py-1 bg-[#E4572E] text-white rounded font-semibold hover:bg-[#E4572E]/80 transition-all"
+            >
+              Add Maps Key
+            </button>
+            <button
+              onClick={initLeaflet}
+              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded transition-all"
+            >
+              Use Tactical GIS
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Map Canvas Viewport */}
       <div className="flex-1 bg-[#0B1220] border border-white/10 rounded-lg overflow-hidden shadow-2xl relative min-h-[520px]">
         <div ref={containerRef} className="w-full h-full min-h-[520px]" style={{ minHeight: '520px' }} />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-slate-400 bg-[#0B1220]/80">
-            {mapError ? `Map status: ${mapError}` : 'Initialising tactical basemap…'}
+            {mapError ? `Map status: ${mapError}` : 'Initialising live map engine…'}
           </div>
         )}
       </div>
+
+      {/* Google Maps Key Configuration Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#0F1A2E] border border-white/15 rounded-xl max-w-lg w-full p-6 shadow-2xl text-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#2E9CCA]/10 border border-[#2E9CCA]/30 flex items-center justify-center text-[#2E9CCA]">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-white text-base">Google Maps API Configuration</h3>
+                  <p className="text-xs text-slate-400 font-mono">Live Google Maps JavaScript API</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowKeyModal(false);
+                  setKeyNotice('');
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs leading-relaxed">
+              <p>
+                Enter your Google Maps JavaScript API key below. The key is securely saved in your browser&apos;s local storage and used immediately for Google Maps rendering.
+              </p>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Google Maps API Key (Starts with <code className="text-[#2E9CCA]">AIzaSy...</code>):
+                </label>
+                <input
+                  type="text"
+                  value={inputKey}
+                  onChange={(e) => setInputKey(e.target.value)}
+                  placeholder="AIzaSyB..."
+                  className="w-full bg-[#0B1220] border border-white/15 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#2E9CCA]"
+                />
+              </div>
+
+              {keyNotice && (
+                <div className="p-2.5 rounded bg-[#F2B138]/10 border border-[#F2B138]/30 text-[#F2B138] text-[11px]">
+                  {keyNotice}
+                </div>
+              )}
+
+              <div className="bg-[#152238] border border-white/10 rounded-lg p-3 space-y-1.5 text-[11px] text-slate-300">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-[#2E9CCA]" />
+                  <span>Important Difference:</span>
+                </div>
+                <p>
+                  • <b>Google OAuth Client ID</b> (e.g. <code>182659964355-...apps.googleusercontent.com</code>) is used for <b>User Sign-In</b>, not maps.
+                </p>
+                <p>
+                  • <b>Google Maps API Key</b> begins with <code>AIzaSy...</code> and is created under <b>Google Cloud Console &gt; APIs &amp; Services &gt; Credentials &gt; API Key</b> with the <b>&quot;Maps JavaScript API&quot;</b> enabled.
+                </p>
+                <a
+                  href="https://console.cloud.google.com/google/maps-apis"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[#2E9CCA] hover:underline pt-1"
+                >
+                  <span>Open Google Cloud Maps Console</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  setInputKey('');
+                  localStorage.removeItem('recq360_google_maps_key');
+                  setKeyNotice('Key cleared. Click Save to apply.');
+                }}
+                className="px-3 py-1.5 rounded text-xs text-slate-400 hover:text-white"
+              >
+                Clear Key
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveKey}
+                className="px-4 py-2 bg-gradient-to-r from-[#2E9CCA] to-[#7C5CFC] hover:opacity-90 text-white rounded-lg text-xs font-semibold shadow flex items-center gap-1.5 transition-all"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Save &amp; Reload Map</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
