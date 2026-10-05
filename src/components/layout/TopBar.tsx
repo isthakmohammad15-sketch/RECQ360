@@ -40,12 +40,11 @@ export const TopBar: React.FC = () => {
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setTimeString(
-        now.toISOString().slice(0, 10) +
-          ' ' +
-          now.toLocaleTimeString('en-IN', { hour12: false }) +
-          ' IST'
-      );
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+      const time = now.toLocaleTimeString('en-IN', { hour12: false });
+      setTimeString(`${day}-${month}-${year} ${time} IST`);
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
