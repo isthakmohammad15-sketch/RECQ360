@@ -44,7 +44,7 @@ export function getAiProviderAndModel() {
       apiKey: geminiKey,
     });
     return {
-      model: provider(process.env["AI_MODEL"] || "gemini-2.5-flash"),
+      model: provider(process.env["AI_MODEL"] || "gemini-flash-latest"),
       providerName: "gemini",
     };
   }
