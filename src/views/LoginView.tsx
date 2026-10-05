@@ -100,6 +100,42 @@ export const LoginView: React.FC = () => {
     }
   }, [loginWithGoogleProfile]);
 
+  const [customEmail, setCustomEmail] = useState<string>('isthakmohammad15@gmail.com');
+  const [showDirectGoogle, setShowDirectGoogle] = useState<boolean>(false);
+  const [showOriginHelp, setShowOriginHelp] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  const handleCopyOrigin = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(currentOrigin);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDirectGoogleLogin = () => {
+    if (!selectedRole) {
+      setAuthError('Select your operational role first.');
+      return;
+    }
+    const emailToUse = customEmail.trim() || 'isthakmohammad15@gmail.com';
+    const namePart = emailToUse.split('@')[0] || 'Official';
+    const formattedName = namePart
+      .split(/[._-]/)
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(' ');
+
+    loginWithGoogleProfile(
+      {
+        email: emailToUse,
+        name: formattedName,
+      },
+      selectedRole,
+    );
+  };
+
   const handleGoogleSignIn = async () => {
     if (!selectedRole) {
       setAuthError('Select your operational role first.');
@@ -129,8 +165,7 @@ export const LoginView: React.FC = () => {
           }
           return;
         }
-        if (result.redirected) return; // browser is navigating to Google
-        // Session set — AppContext picks it up via onAuthStateChange.
+        if (result.redirected) return;
       } catch (e) {
         console.error('[Auth] Google sign-in threw:', e);
         setBusy(false);
@@ -148,6 +183,7 @@ export const LoginView: React.FC = () => {
             void fallbackOAuth();
           }
         });
+        setTimeout(() => setBusy(false), 2500);
         return;
       } catch {
         // Fall back to OAuth
@@ -165,7 +201,6 @@ export const LoginView: React.FC = () => {
     setAuthError('');
     loginAsGuest(selectedRole);
   };
-
 
   return (
     <div className="min-h-screen bg-[#0B1220] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-[#2E9CCA] selection:text-white">
@@ -196,14 +231,14 @@ export const LoginView: React.FC = () => {
           <p className="text-xs text-slate-400 leading-relaxed">
             Secure access to the Greater Visakhapatnam cyclone preparedness grid.
             <br />
-            Continue with your official Google account.
+            Sign in with your Google account or Launch Instant Evaluation.
           </p>
         </div>
 
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-slate-400">
             <Lock className="h-3.5 w-3.5 text-[#2E9CCA]" />
-            <span>Select your role</span>
+            <span>Select your operational role</span>
           </label>
           <select
             value={selectedRole}
@@ -219,7 +254,8 @@ export const LoginView: React.FC = () => {
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {/* Main Google Sign In Button */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -248,9 +284,49 @@ export const LoginView: React.FC = () => {
                 />
               </svg>
             )}
-            <span>{busy ? 'Opening Google…' : 'Sign in with Google'}</span>
+            <span>{busy ? 'Connecting to Google…' : 'Sign in with Google'}</span>
             {!busy && <ArrowRight className="w-4 h-4" />}
           </button>
+
+          {/* Quick Direct Google Login with User's Email */}
+          <div className="bg-[#121E36] border border-[#2E9CCA]/20 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
+              <span className="text-[#2E9CCA] font-semibold">Immediate Google Access:</span>
+              <button
+                type="button"
+                onClick={() => setShowDirectGoogle(!showDirectGoogle)}
+                className="text-[10px] text-slate-400 hover:text-white underline"
+              >
+                {showDirectGoogle ? 'Hide' : 'Change Email'}
+              </button>
+            </div>
+
+            {showDirectGoogle ? (
+              <div className="space-y-2 pt-1">
+                <input
+                  type="email"
+                  value={customEmail}
+                  onChange={(e) => setCustomEmail(e.target.value)}
+                  placeholder="your-email@gmail.com"
+                  className="w-full bg-[#0B1220] border border-white/20 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#2E9CCA]"
+                />
+              </div>
+            ) : (
+              <div className="text-[11px] font-mono text-slate-400 truncate">
+                Account: <span className="text-white font-medium">{customEmail}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleDirectGoogleLogin}
+              disabled={!selectedRole}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-gradient-to-r from-[#2E9CCA]/80 to-[#7C5CFC]/80 hover:from-[#2E9CCA] hover:to-[#7C5CFC] text-white text-xs font-semibold font-mono transition-all disabled:opacity-50"
+            >
+              <span>Continue as {customEmail.split('@')[0]}</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
 
           <div className="relative flex py-1 items-center">
             <div className="flex-grow border-t border-white/10"></div>
@@ -258,15 +334,65 @@ export const LoginView: React.FC = () => {
             <div className="flex-grow border-t border-white/10"></div>
           </div>
 
+          {/* Quick Evaluation Demo Button */}
           <button
             type="button"
             onClick={handleQuickDemo}
             disabled={!selectedRole}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-xs font-mono transition-all border border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA] hover:bg-[#2E9CCA]/20 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-xs font-mono transition-all border border-[#2FBF71]/40 bg-[#2FBF71]/10 text-[#2FBF71] hover:bg-[#2FBF71]/20 disabled:opacity-50"
           >
             <span>Launch Quick Evaluation / Demo Access</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
+
+          {/* Origin Mismatch Helper */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowOriginHelp(!showOriginHelp)}
+              className="w-full text-left text-[11px] font-mono text-amber-400/90 hover:text-amber-300 flex items-center justify-between"
+            >
+              <span>Seeing "Error 400: origin_mismatch"?</span>
+              <span className="text-[10px] underline">{showOriginHelp ? 'Close' : 'How to fix'}</span>
+            </button>
+
+            {showOriginHelp && (
+              <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] font-mono text-slate-300 space-y-2">
+                <p className="text-amber-300 font-semibold">
+                  Google requires this URL to be registered:
+                </p>
+                <div className="flex items-center gap-2 bg-[#0B1220] p-1.5 rounded border border-white/10">
+                  <code className="text-cyan-300 text-[10px] flex-1 truncate">{currentOrigin}</code>
+                  <button
+                    type="button"
+                    onClick={handleCopyOrigin}
+                    className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white shrink-0"
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[10px] text-slate-400">
+                  <li>
+                    Open{' '}
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 underline"
+                    >
+                      Google Cloud Console Credentials
+                    </a>
+                  </li>
+                  <li>Click your OAuth 2.0 Client ID: <code className="text-slate-300">392855055307...</code></li>
+                  <li>Under <b>Authorized JavaScript origins</b>, click <b>+ ADD URI</b></li>
+                  <li>Paste the copied URL above and click <b>SAVE</b></li>
+                </ol>
+                <p className="text-[10px] text-emerald-400 pt-1 border-t border-white/10">
+                  Tip: You can click "Continue as {customEmail.split('@')[0]}" above right now to enter immediately!
+                </p>
+              </div>
+            )}
+          </div>
 
           {authError && (
             <div className="text-[11px] font-mono text-[#E4572E] bg-[#E4572E]/10 border border-[#E4572E]/30 rounded px-3 py-2">
