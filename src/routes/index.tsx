@@ -17,7 +17,6 @@ import { AdminView } from "../views/AdminView";
 import { Toaster } from "../components/ui/sonner";
 
 export const Route = createFileRoute("/")({
-  ssr: false,
   head: () => ({
     meta: [
       { title: "RECQ360 — Integrated Disaster Risk Management Platform" },
