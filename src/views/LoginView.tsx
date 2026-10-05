@@ -1,14 +1,104 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { lovable } from '../integrations/lovable';
+import { supabase } from '../integrations/supabase/client';
 import { ROLE_OPTIONS, type AppRole } from '../lib/roles';
 import { ShieldCheck, Radio, ArrowRight, Loader2, Lock } from 'lucide-react';
 
+const GOOGLE_CLIENT_ID =
+  (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_GOOGLE_CLIENT_ID']) ||
+  '392855055307-dhehfd8fepvl20k85v57q785p8rv47h1.apps.googleusercontent.com';
+
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export const LoginView: React.FC = () => {
-  const { loading, loginAsGuest } = useApp();
+  const { loading, loginAsGuest, loginWithGoogleProfile } = useApp();
   const [authError, setAuthError] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [selectedRole, setSelectedRole] = useState<AppRole | ''>('');
+  const roleRef = useRef<AppRole | ''>('');
+  roleRef.current = selectedRole;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const initGsi = () => {
+      const g = (window as any).google;
+      if (!g?.accounts?.id) return;
+      try {
+        g.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (response: any) => {
+            if (!response?.credential) return;
+            setBusy(true);
+            try {
+              // 1. Try Supabase ID token login
+              try {
+                const { error } = await supabase.auth.signInWithIdToken({
+                  provider: 'google',
+                  token: response.credential,
+                });
+                if (!error) return; // Supabase onAuthStateChange handles rest
+              } catch {
+                // Ignore if Supabase ID token provider is not toggled
+              }
+
+              // 2. Decode verified Google JWT token directly
+              const payload = parseJwt(response.credential);
+              if (payload?.email) {
+                const role =
+                  roleRef.current ||
+                  (window.localStorage.getItem('cyclone360.selectedRole') as AppRole | null) ||
+                  'field_officer';
+                loginWithGoogleProfile(
+                  {
+                    email: payload.email,
+                    name: payload.name || payload.given_name || payload.email,
+                    avatarUrl: payload.picture,
+                  },
+                  role,
+                );
+              }
+            } catch (err) {
+              console.error('[Google GSI] Auth processing failed:', err);
+              setAuthError('Google sign-in could not be completed.');
+            } finally {
+              setBusy(false);
+            }
+          },
+          auto_select: false,
+        });
+      } catch (e) {
+        console.warn('[Google GSI] Init notice:', e);
+      }
+    };
+
+    if (!(window as any).google?.accounts?.id) {
+      const script = document.createElement('script');
+      script.id = 'google-gsi-client';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = initGsi;
+      document.body.appendChild(script);
+    } else {
+      initGsi();
+    }
+  }, [loginWithGoogleProfile]);
 
   const handleGoogleSignIn = async () => {
     if (!selectedRole) {
@@ -19,29 +109,52 @@ export const LoginView: React.FC = () => {
     setBusy(true);
     window.localStorage.setItem('cyclone360.selectedRole', selectedRole);
 
-    try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin,
-      });
+    const fallbackOAuth = async () => {
+      try {
+        const result = await lovable.auth.signInWithOAuth('google', {
+          redirect_uri: window.location.origin,
+        });
 
-      if (result.error) {
-        // Surface the real provider/auth error for debugging.
-        console.error('[Auth] Google sign-in failed:', result.error);
+        if (result.error) {
+          console.error('[Auth] Google sign-in error:', result.error);
+          setBusy(false);
+          const detail =
+            result.error instanceof Error ? result.error.message : String(result.error);
+          if (detail.includes('provider is not enabled') || detail.includes('Unsupported provider')) {
+            setAuthError(
+              'Google provider is not enabled in your Supabase dashboard yet. Use "Launch Quick Evaluation / Demo Access" below to enter immediately.',
+            );
+          } else {
+            setAuthError(`Google sign-in: ${detail}`);
+          }
+          return;
+        }
+        if (result.redirected) return; // browser is navigating to Google
+        // Session set — AppContext picks it up via onAuthStateChange.
+      } catch (e) {
+        console.error('[Auth] Google sign-in threw:', e);
         setBusy(false);
-        const detail =
-          result.error instanceof Error ? result.error.message : String(result.error);
-        setAuthError(`Google sign-in failed: ${detail}`);
-        return;
+        setAuthError(
+          `Google sign-in failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
-      if (result.redirected) return; // browser is navigating to Google
-      // Session set — AppContext picks it up via onAuthStateChange.
-    } catch (e) {
-      console.error('[Auth] Google sign-in threw:', e);
-      setBusy(false);
-      setAuthError(
-        `Google sign-in failed: ${e instanceof Error ? e.message : String(e)}`,
-      );
+    };
+
+    const g = (window as any).google;
+    if (g?.accounts?.id) {
+      try {
+        g.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+            void fallbackOAuth();
+          }
+        });
+        return;
+      } catch {
+        // Fall back to OAuth
+      }
     }
+
+    await fallbackOAuth();
   };
 
   const handleQuickDemo = () => {

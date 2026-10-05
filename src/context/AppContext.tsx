@@ -62,6 +62,7 @@ interface AppContextType {
   setCurrentUser: (user: User) => void;
   appRole: AppRole | null;
   loginAsGuest: (role: AppRole) => void;
+  loginWithGoogleProfile: (profile: { email: string; name: string; avatarUrl?: string }, role: AppRole) => void;
   perms: Permissions;
   canEdit: boolean;
   notifications: AppNotification[];
@@ -379,6 +380,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(true);
     setActiveTab(permissionsFor(role).defaultTab);
   }, []);
+
+  const loginWithGoogleProfile = useCallback(
+    (profile: { email: string; name: string; avatarUrl?: string }, role: AppRole) => {
+      const user: User = {
+        id: `google-${profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        name: profile.name || profile.email,
+        role: toUiRole(role),
+        email: profile.email,
+        title: roleLabel(role),
+        avatar:
+          profile.avatarUrl ||
+          (profile.name || profile.email)
+            .split(' ')
+            .map((p: string) => p[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase(),
+      };
+      setAppRole(role);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setActiveTab(permissionsFor(role).defaultTab);
+    },
+    [],
+  );
 
   /* -------------------------------- derived -------------------------------- */
 
@@ -887,6 +913,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loading,
         signOut,
         loginAsGuest,
+        loginWithGoogleProfile,
         users,
         zones: visibleZones,
         assets: visibleAssets,

@@ -65,10 +65,22 @@ export const lovable = {
 
       // On Vercel, localhost, or custom domains, authenticate directly with Supabase OAuth
       try {
+        const queryParams: Record<string, string> = {
+          ...opts?.extraParams,
+        };
+        const googleClientId =
+          import.meta.env['VITE_GOOGLE_CLIENT_ID'] ||
+          process.env['VITE_GOOGLE_CLIENT_ID'] ||
+          '392855055307-dhehfd8fepvl20k85v57q785p8rv47h1.apps.googleusercontent.com';
+        if (googleClientId) {
+          queryParams['client_id'] = googleClientId;
+        }
+
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: provider as "google",
           options: {
             redirectTo: redirectUri,
+            queryParams,
           },
         });
         if (error) {
