@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Bell,
   Sparkles,
+  MapPin,
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -23,6 +24,14 @@ export const TopBar: React.FC = () => {
     notifications,
     unreadCount,
     markAllNotificationsRead,
+    selectedStateId,
+    selectedCityId,
+    activeCity,
+    activeState,
+    setSelectedState,
+    setSelectedCity,
+    availableStates,
+    availableCitiesForState,
   } = useApp();
   const [timeString, setTimeString] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -48,7 +57,7 @@ export const TopBar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 bg-[#0F1A2E]/95 backdrop-blur border-b border-white/10 px-4 lg:px-6 py-2.5 flex items-center justify-between shadow-lg">
       {/* Left branding & live warning info */}
-      <div className="flex items-center gap-3 md:gap-5">
+      <div className="flex items-center gap-3 md:gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <div className="relative flex items-center justify-center w-8 h-8 rounded bg-[#E4572E]/20 border border-[#E4572E]/40 text-[#E4572E]">
             <ShieldAlert className="w-5 h-5 animate-pulse" />
@@ -59,16 +68,61 @@ export const TopBar: React.FC = () => {
               RECQ360
             </h1>
             <p className="text-[11px] font-mono text-slate-400">
-              Visakhapatnam Municipal Corporation
+              {activeCity ? `${activeCity.name} Disaster Grid` : 'Global Disaster Grid'}
             </p>
           </div>
         </div>
 
-        {/* Warning Badge */}
-        <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded border border-[#E4572E]/40 bg-[#E4572E]/10 text-[#E4572E] text-xs font-mono glow-red">
-          <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
-          <span>CYC-STAGE 3: SEVERE ADVISORY</span>
+        {/* Global Cascading Location Selector: State -> City */}
+        <div className="flex items-center gap-1.5 bg-[#0B1220] border border-[#2E9CCA]/40 rounded-lg px-2 py-1 text-xs font-mono shadow-inner">
+          <MapPin className="w-3.5 h-3.5 text-[#2E9CCA] shrink-0" />
+
+          {/* State Dropdown */}
+          <select
+            value={selectedStateId}
+            onChange={(e) => setSelectedState(e.target.value)}
+            className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+            title="Choose State / Region"
+          >
+            {availableStates.map((st) => (
+              <option key={st.id} value={st.id} className="bg-[#0F1A2E] text-white">
+                {st.name}
+              </option>
+            ))}
+          </select>
+
+          <span className="text-slate-500 font-mono">/</span>
+
+          {/* City Dropdown: ONLY contains cities belonging to selectedState */}
+          <select
+            value={selectedCityId}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/30 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer"
+            title={`Choose City in ${activeState?.name || 'this state'}`}
+          >
+            {availableCitiesForState.map((ct) => (
+              <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                {ct.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {/* Dynamic Threat / Advisory Badge */}
+        {activeCity && (
+          <div
+            className={`hidden xl:flex items-center gap-2 px-2.5 py-1 rounded border text-xs font-mono ${
+              activeCity.advisorySeverity === 'critical'
+                ? 'border-[#E4572E]/40 bg-[#E4572E]/10 text-[#E4572E] glow-red'
+                : activeCity.advisorySeverity === 'warning'
+                ? 'border-[#F2B138]/40 bg-[#F2B138]/10 text-[#F2B138]'
+                : 'border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA]'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
+            <span>{activeCity.currentAdvisory}</span>
+          </div>
+        )}
       </div>
 
       {/* Right controls */}

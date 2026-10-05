@@ -61,6 +61,8 @@ export const OverviewView: React.FC = () => {
     triggerSimulatedAlert,
     perms,
     deleteZone,
+    activeCity,
+    activeState,
   } = useApp();
 
   const [inspectZone, setInspectZone] = useState<Zone | null>(null);
@@ -83,14 +85,14 @@ export const OverviewView: React.FC = () => {
             <div className="flex items-center gap-2 mb-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2FBF71] animate-ping" />
               <span className="text-xs font-mono uppercase tracking-widest text-[#2E9CCA]">
-                CITY-WIDE LIVE SIGNAL • VISAKHAPATNAM
+                LIVE DISASTER GRID • {activeCity ? activeCity.name.toUpperCase() : 'VISAKHAPATNAM'} ({activeState ? activeState.name.toUpperCase() : 'ANDHRA PRADESH'})
               </span>
             </div>
             <h1 className="font-display font-bold text-2xl md:text-3xl text-white tracking-tight">
-              COMMISSIONER READINESS OVERVIEW
+              DISASTER MANAGEMENT &amp; READINESS OVERVIEW
             </h1>
             <p className="text-xs md:text-sm text-slate-300 font-sans mt-1">
-              Monitored live across 10 Municipal Zones ahead of Cyclone Landfall.
+              Live operational command across {zones.length} zones • Primary Hazard: {activeCity?.primaryHazard || 'Multi-Hazard Emergency Grid'}.
             </p>
           </div>
 

@@ -138,7 +138,7 @@ const makeSvgMarker = (color: string, label: string) => {
 };
 
 export const MapView: React.FC = () => {
-  const { zones, shelters, assets, navigateTo } = useApp();
+  const { zones, shelters, assets, navigateTo, activeCity, activeState } = useApp();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -190,9 +190,12 @@ export const MapView: React.FC = () => {
       }
       containerRef.current.innerHTML = '';
 
+      const mapCenter = activeCity?.center || VIZAG_CENTER;
+      const mapZoom = activeCity?.zoom || 12;
+
       const map = L.map(containerRef.current, {
-        center: [VIZAG_CENTER.lat, VIZAG_CENTER.lng],
-        zoom: 12,
+        center: [mapCenter.lat, mapCenter.lng],
+        zoom: mapZoom,
         zoomControl: true,
       });
 
@@ -250,9 +253,12 @@ export const MapView: React.FC = () => {
     loadGoogleMapsScript(customKey)
       .then((google) => {
         if (!containerRef.current) return;
+        const mapCenter = activeCity?.center || VIZAG_CENTER;
+        const mapZoom = activeCity?.zoom || 12;
+
         const gMap = new google.maps.Map(containerRef.current, {
-          center: VIZAG_CENTER,
-          zoom: 12,
+          center: mapCenter,
+          zoom: mapZoom,
           styles: googleTheme === 'dark' ? DARK_STYLE : [],
           disableDefaultUI: false,
           mapTypeControl: true,
@@ -287,6 +293,20 @@ export const MapView: React.FC = () => {
       }
     };
   }, [initGoogleMaps]);
+
+  // Dynamic re-centering whenever active city changes
+  useEffect(() => {
+    if (!ready || !activeCity) return;
+    const center = activeCity.center;
+    const zoom = activeCity.zoom || 12;
+
+    if (engine === 'google' && mapRef.current) {
+      mapRef.current.panTo(center);
+      mapRef.current.setZoom(zoom);
+    } else if (engine === 'leaflet' && leafletMapRef.current) {
+      leafletMapRef.current.setView([center.lat, center.lng], zoom);
+    }
+  }, [activeCity, engine, ready]);
 
   // Handle switching between Dark style and Natural Google Maps style
   useEffect(() => {
@@ -388,8 +408,9 @@ export const MapView: React.FC = () => {
         });
       }
 
+      const activeHotspots = activeCity?.hotspots && activeCity.hotspots.length > 0 ? activeCity.hotspots : FLOOD_HOTSPOTS;
       if (showFloodHotspots) {
-        FLOOD_HOTSPOTS.forEach((hs) => {
+        activeHotspots.forEach((hs) => {
           const circle = new google.maps.Circle({
             map,
             center: { lat: hs.lat, lng: hs.lng },
@@ -496,8 +517,9 @@ export const MapView: React.FC = () => {
         });
       }
 
+      const activeHotspots = activeCity?.hotspots && activeCity.hotspots.length > 0 ? activeCity.hotspots : FLOOD_HOTSPOTS;
       if (showFloodHotspots) {
-        FLOOD_HOTSPOTS.forEach((hs) => {
+        activeHotspots.forEach((hs) => {
           const circle = L.circle([hs.lat, hs.lng], {
             radius: hs.radius,
             color: '#E4572E',
@@ -549,7 +571,7 @@ export const MapView: React.FC = () => {
         <div>
           <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
             <MapPin className="w-5 h-5 text-[#2E9CCA]" />
-            <span>Interactive Tactical Map — Greater Visakhapatnam</span>
+            <span>Interactive Tactical Map — {activeCity ? activeCity.name : 'Greater Visakhapatnam'} ({activeState?.name || 'Global Grid'})</span>
           </h1>
           <p className="text-xs text-slate-400 font-mono flex flex-wrap items-center gap-2 mt-0.5">
             <span className="flex items-center gap-1.5">
@@ -559,7 +581,9 @@ export const MapView: React.FC = () => {
               </b>
             </span>
             <span>•</span>
-            <span>{zones.length} zones, {shelters.length} cyclone shelters, {assets.length} critical assets & coastal hotspots</span>
+            <span className="text-slate-300">{activeCity?.primaryHazard || 'Multi-Hazard Grid'}</span>
+            <span>•</span>
+            <span>{zones.length} zones, {shelters.length} cyclone shelters, {assets.length} critical assets</span>
           </p>
         </div>
 

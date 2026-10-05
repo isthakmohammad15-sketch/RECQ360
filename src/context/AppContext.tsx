@@ -10,6 +10,8 @@ import {
   ChecklistItem,
   DepartmentProgress,
   EmergencyContact,
+  DisasterCity,
+  DisasterState,
 } from '../types';
 import { supabase } from '../integrations/supabase/client';
 import {
@@ -35,6 +37,12 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_CHECKLIST_TEMPLATES,
 } from '../data/seedData';
+import {
+  GLOBAL_DISASTER_REGIONS,
+  DEFAULT_STATE_ID,
+  DEFAULT_CITY_ID,
+  findCityById,
+} from '../data/regionsData';
 
 const STORAGE_PREFIX = 'cyclone360.local_';
 const DELETED_PREFIX = 'cyclone360.deleted_';
@@ -266,15 +274,76 @@ interface AppContextType {
   createShelter: (v: Record<string, any>) => Promise<void>;
   createAlert: (v: Record<string, any>) => Promise<void>;
   createContact: (v: Record<string, any>) => Promise<void>;
+  selectedStateId: string;
+  selectedCityId: string;
+  activeCity: DisasterCity;
+  activeState: DisasterState;
+  setSelectedState: (stateId: string) => void;
+  setSelectedCity: (cityId: string) => void;
+  availableStates: DisasterState[];
+  availableCitiesForState: DisasterCity[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<User>(GUEST_USER);
-  const [appRole, setAppRole] = useState<AppRole | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_OFFICER);
+  const [appRole, setAppRole] = useState<AppRole | null>('commissioner');
   const [loading, setLoading] = useState<boolean>(true);
+
+  const [selectedStateId, setSelectedStateId] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('recq360_state_id')) || DEFAULT_STATE_ID;
+  });
+  const [selectedCityId, setSelectedCityId] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('recq360_city_id')) || DEFAULT_CITY_ID;
+  });
+
+  const availableStates = GLOBAL_DISASTER_REGIONS;
+
+  const activeState = useMemo(() => {
+    return GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId) || GLOBAL_DISASTER_REGIONS[0];
+  }, [selectedStateId]);
+
+  const availableCitiesForState = useMemo(() => {
+    return activeState?.cities || [];
+  }, [activeState]);
+
+  const activeCity = useMemo(() => {
+    return (
+      availableCitiesForState.find((c) => c.id === selectedCityId) ||
+      availableCitiesForState[0] ||
+      findCityById('visakhapatnam')!
+    );
+  }, [availableCitiesForState, selectedCityId]);
+
+  const setSelectedState = useCallback((stateId: string) => {
+    const state = GLOBAL_DISASTER_REGIONS.find((s) => s.id === stateId);
+    if (!state) return;
+    setSelectedStateId(stateId);
+    if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', stateId);
+    if (state.cities.length > 0) {
+      const firstCity = state.cities[0];
+      setSelectedCityId(firstCity.id);
+      if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', firstCity.id);
+      toast.success(`Selected State: ${state.name}`, { description: `Active Grid: ${firstCity.name}` });
+    }
+  }, []);
+
+  const setSelectedCity = useCallback((cityId: string) => {
+    const city = findCityById(cityId);
+    if (!city) return;
+    const parentState = GLOBAL_DISASTER_REGIONS.find((s) => s.cities.some((c) => c.id === cityId));
+    if (parentState && parentState.id !== selectedStateId) {
+      setSelectedStateId(parentState.id);
+      if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', parentState.id);
+    }
+    setSelectedCityId(cityId);
+    if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', cityId);
+    toast.success(`Operational Grid Changed: ${city.name}`, {
+      description: `${city.state} • Primary Hazard: ${city.primaryHazard}`,
+    });
+  }, [selectedStateId]);
 
   const [users, setUsers] = useState<User[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -289,7 +358,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [directory, setDirectory] = useState<DirectoryUser[]>([]);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
 
-  const [activeTab, setActiveTab] = useState<string>('login');
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedShelterId, setSelectedShelterId] = useState<string | null>(null);
@@ -477,6 +546,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     void loadAll();
   }, [loadAll]);
 
+  // Synchronize active city datasets across the entire platform
+  useEffect(() => {
+    if (activeCity) {
+      if (activeCity.id !== 'visakhapatnam') {
+        if (activeCity.zones && activeCity.zones.length > 0) {
+          setZones(activeCity.zones);
+        }
+        if (activeCity.shelters && activeCity.shelters.length > 0) {
+          setShelters(activeCity.shelters);
+        }
+        if (activeCity.assets && activeCity.assets.length > 0) {
+          setAssets(activeCity.assets);
+        }
+        if (activeCity.alerts && activeCity.alerts.length > 0) {
+          setAlerts(activeCity.alerts);
+        }
+      } else {
+        void loadAll();
+      }
+    }
+  }, [activeCity, loadAll]);
+
   // Live updates across every operational table.
   useEffect(() => {
     const channel = supabase
@@ -607,10 +698,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const signOut = async () => {
     await supabase.auth.signOut().catch(() => {});
-    setIsAuthenticated(false);
-    setAppRole(null);
+    setIsAuthenticated(true);
+    setAppRole('commissioner');
     setCurrentUser(DEFAULT_OFFICER);
-    setActiveTab('login');
+    setActiveTab('dashboard');
+    toast.info('Session reset to Chief Operations Commander.');
   };
 
   const loginAsGuest = useCallback((role: AppRole) => {
@@ -741,10 +833,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [visibleZones]);
 
   const navigateTo = (tab: string, params?: { zoneId?: string; assetId?: string; shelterId?: string }) => {
-    if (!isAuthenticated && tab !== 'login') {
-      setActiveTab('login');
-      return;
-    }
     setActiveTab(tab);
     if (params?.zoneId !== undefined) setSelectedZoneId(params.zoneId);
     if (params?.assetId !== undefined) setSelectedAssetId(params.assetId);
@@ -1418,6 +1506,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createShelter,
         createAlert,
         createContact,
+        selectedStateId,
+        selectedCityId,
+        activeCity,
+        activeState,
+        setSelectedState,
+        setSelectedCity,
+        availableStates,
+        availableCitiesForState,
       }}
     >
       {children}

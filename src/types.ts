@@ -209,3 +209,29 @@ export interface EmergencyContact {
   email: string;
   availability: string;
 }
+
+export interface DisasterCity {
+  id: string;
+  name: string;
+  state: string;
+  country: string;
+  center: { lat: number; lng: number };
+  zoom: number;
+  primaryHazard: string;
+  currentAdvisory: string;
+  advisorySeverity: 'critical' | 'warning' | 'info';
+  readinessScore: number;
+  zones: Zone[];
+  shelters: Shelter[];
+  assets: Asset[];
+  hotspots: Array<{ id: string; name: string; lat: number; lng: number; radius: number; severity: string }>;
+  alerts: AlertItem[];
+}
+
+export interface DisasterState {
+  id: string;
+  name: string;
+  country: string;
+  cities: DisasterCity[];
+}
+
