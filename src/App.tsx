@@ -3,6 +3,7 @@ import { AppProvider, useApp } from "./context/AppContext";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { LandingView } from "./views/LandingView";
+import { LoginView } from "./views/LoginView";
 import { OverviewView } from "./views/OverviewView";
 import { ZoneDetailView } from "./views/ZoneDetailView";
 import { AssetManagementView } from "./views/AssetManagementView";
@@ -59,6 +60,10 @@ function CurrentView() {
 
 function RECQ360() {
   const { isAuthenticated, activeTab } = useApp();
+
+  if (activeTab === "login") {
+    return <LoginView />;
+  }
 
   if (!isAuthenticated || activeTab === "landing") {
     return <LandingView />;

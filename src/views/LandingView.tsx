@@ -565,7 +565,7 @@ const Footer: React.FC = () => (
 /* --------------------------------- screen --------------------------------- */
 
 export const LandingView: React.FC = () => {
-  const { zones, loginAsGuest } = useApp();
+  const { zones, navigateTo } = useApp();
   const [showLogin, setShowLogin] = useState(false);
 
   const readiness = useMemo(() => {
@@ -581,10 +581,7 @@ export const LandingView: React.FC = () => {
   }, [showLogin]);
 
   const open = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('recq360_signed_out');
-    }
-    loginAsGuest('commissioner');
+    navigateTo('login');
   };
 
   return (

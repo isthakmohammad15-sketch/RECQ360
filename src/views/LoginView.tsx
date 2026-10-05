@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { lovable } from '../integrations/lovable';
 import { supabase } from '../integrations/supabase/client';
 import { ROLE_OPTIONS, type AppRole } from '../lib/roles';
-import { ShieldCheck, Radio, ArrowRight, Loader2, Lock } from 'lucide-react';
+import { ShieldCheck, Radio, ArrowRight, Loader2, Lock, ArrowLeft } from 'lucide-react';
 
 const GOOGLE_CLIENT_ID =
   (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_GOOGLE_CLIENT_ID']) ||
@@ -26,13 +25,14 @@ function parseJwt(token: string) {
 }
 
 export const LoginView: React.FC = () => {
-  const { loading, loginAsGuest, loginWithGoogleProfile } = useApp();
+  const { loginWithGoogleProfile, navigateTo } = useApp();
   const [authError, setAuthError] = useState<string>('');
-  const [busy, setBusy] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<AppRole | ''>('commissioner');
-  const roleRef = useRef<AppRole | ''>('commissioner');
+  const [busy, setBusy] = useState<boolean>(false);
+  const [selectedRole, setSelectedRole] = useState<AppRole | ''>('');
+  const roleRef = useRef<AppRole | ''>('');
   roleRef.current = selectedRole;
 
+  // Initialize Google Identity Services (GSI)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -52,9 +52,9 @@ export const LoginView: React.FC = () => {
                   provider: 'google',
                   token: response.credential,
                 });
-                if (!error) return; // Supabase onAuthStateChange handles rest
+                if (!error) return; // Supabase onAuthStateChange handles session
               } catch {
-                // Ignore if Supabase ID token provider is not toggled
+                // Fallback to direct verified JWT
               }
 
               // 2. Decode verified Google JWT token directly
@@ -63,7 +63,8 @@ export const LoginView: React.FC = () => {
                 const role =
                   roleRef.current ||
                   (window.localStorage.getItem('cyclone360.selectedRole') as AppRole | null) ||
-                  'field_officer';
+                  'commissioner';
+
                 loginWithGoogleProfile(
                   {
                     email: payload.email,
@@ -75,7 +76,7 @@ export const LoginView: React.FC = () => {
               }
             } catch (err) {
               console.error('[Google GSI] Auth processing failed:', err);
-              setAuthError('Google sign-in could not be completed.');
+              setAuthError('Google sign-in could not be completed. Please try again.');
             } finally {
               setBusy(false);
             }
@@ -100,150 +101,152 @@ export const LoginView: React.FC = () => {
     }
   }, [loginWithGoogleProfile]);
 
-  const [customEmail, setCustomEmail] = useState<string>('isthakmohammad15@gmail.com');
-  const [showDirectGoogle, setShowDirectGoogle] = useState<boolean>(false);
-  const [showOriginHelp, setShowOriginHelp] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
-
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-
-  const handleCopyOrigin = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(currentOrigin);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleDirectGoogleLogin = () => {
-    if (!selectedRole) {
-      setAuthError('Select your operational role first.');
-      return;
-    }
-    const emailToUse = customEmail.trim() || 'isthakmohammad15@gmail.com';
-    const namePart = emailToUse.split('@')[0] || 'Official';
-    const formattedName = namePart
-      .split(/[._-]/)
-      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-      .join(' ');
-
-    loginWithGoogleProfile(
-      {
-        email: emailToUse,
-        name: formattedName,
-      },
-      selectedRole,
-    );
-  };
-
   const handleGoogleSignIn = async () => {
     if (!selectedRole) {
-      setAuthError('Select your operational role first.');
+      setAuthError('Please select your operational role first.');
       return;
     }
     setAuthError('');
     setBusy(true);
-    window.localStorage.setItem('cyclone360.selectedRole', selectedRole);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('cyclone360.selectedRole', selectedRole);
+    }
 
-    const g = (window as any).google;
-    if (g?.accounts?.id) {
-      try {
+    try {
+      // 1. Trigger Google GSI OneTap / Prompt
+      const g = (window as any).google;
+      let promptAttempted = false;
+
+      if (g?.accounts?.id) {
+        promptAttempted = true;
         g.accounts.id.prompt((notification: any) => {
           if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
-            setBusy(false);
-            setAuthError(
-              `Google OAuth origin blocked. In Google Cloud Console, add "${currentOrigin}" to Authorized JavaScript origins, OR click "Continue as ${customEmail.split('@')[0]}" below to enter instantly!`,
-            );
-            setShowOriginHelp(true);
+            console.log('[Google Auth] GSI prompt skipped, falling back to Supabase OAuth redirect...');
+            void triggerSupabaseOAuth();
           }
         });
         setTimeout(() => setBusy(false), 2500);
         return;
-      } catch (err) {
-        console.warn('Google GSI prompt error:', err);
       }
-    }
 
-    setBusy(false);
-    setAuthError(
-      `Google OAuth origin blocked. In Google Cloud Console, add "${currentOrigin}" to Authorized JavaScript origins, OR click "Continue as ${customEmail.split('@')[0]}" below to enter instantly!`,
-    );
-    setShowOriginHelp(true);
+      // 2. Fallback to Supabase OAuth redirect
+      if (!promptAttempted) {
+        await triggerSupabaseOAuth();
+      }
+    } catch (err: any) {
+      console.error('[Google Auth] Sign-in error:', err);
+      setAuthError(err.message || 'Google sign-in failed. Please try again.');
+      setBusy(false);
+    }
   };
 
-  const handleDutyAccess = () => {
-    if (!selectedRole) {
-      setAuthError('Select your operational role first.');
-      return;
+  const triggerSupabaseOAuth = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      });
+      if (error) {
+        setAuthError(error.message || 'Google sign-in could not be initiated.');
+        setBusy(false);
+      }
+    } catch (e: any) {
+      setAuthError(e.message || 'Could not connect to Google authentication.');
+      setBusy(false);
     }
-    setAuthError('');
-    loginAsGuest(selectedRole);
   };
 
   return (
     <div className="min-h-screen bg-[#0B1220] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-[#2E9CCA] selection:text-white">
+      {/* Background Subtle Grid Texture */}
       <div className="absolute inset-0 bg-[radial-gradient(#152238_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
 
-      <div className="max-w-md w-full bg-[#0F1A2E] border border-[#2E9CCA]/30 rounded-xl p-6 sm:p-8 shadow-[0_0_35px_rgba(46,156,202,0.12)] relative z-10 space-y-6">
-        {/* Logo */}
+      {/* Main Card Container */}
+      <div className="max-w-md w-full bg-[#0F1A2E] border border-[#2E9CCA]/25 rounded-2xl p-6 sm:p-8 shadow-[0_0_40px_rgba(46,156,202,0.14)] relative z-10 space-y-6">
+        {/* Brand & Command Center Header */}
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
-            <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#2E9CCA] to-[#7C5CFC] flex items-center justify-center font-display font-bold text-xl text-white shadow-md glow-cyan">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2E9CCA] to-[#7C5CFC] flex items-center justify-center font-display font-bold text-2xl text-white shadow-lg glow-cyan">
               RQ
             </div>
             <div className="text-left">
-              <div className="font-display font-bold text-xl text-white leading-none">RECQ360</div>
-              <div className="text-[10px] font-mono text-[#2E9CCA] tracking-widest uppercase font-semibold">
+              <div className="font-display font-bold text-2xl text-white leading-none tracking-tight">
+                RECQ360
+              </div>
+              <div className="text-[10px] font-mono text-[#2E9CCA] tracking-widest uppercase font-semibold mt-1">
                 COMMAND CENTER
               </div>
             </div>
           </div>
 
+          {/* Real-time sync status pill */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2FBF71]/10 border border-[#2FBF71]/30 font-mono text-[10px] text-[#2FBF71]">
             <Radio className="w-3 h-3 animate-pulse" />
-            <span>
-              {loading ? 'CONNECTING TO OPERATIONAL GRID…' : 'LIVE SYSTEM ONLINE • REAL-TIME TELEMETRY'}
-            </span>
+            <span>LIVE SYSTEM ONLINE • REAL-TIME SYNC</span>
           </div>
 
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Government of Andhra Pradesh • Greater Visakhapatnam Municipal Corporation
-            <br />
-            <span className="text-slate-300 font-medium">Unified Disaster Preparedness & Field Response Grid</span>
-          </p>
+          {/* Description Copy */}
+          <div className="space-y-1.5 pt-1 text-center">
+            <div className="text-white font-semibold text-sm">
+              Secure access to RECQ360
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Access the global disaster preparedness and response platform securely.
+            </p>
+            <div className="text-xs text-slate-400 font-semibold pt-0.5">
+              Continue with your official Google account.
+            </div>
+          </div>
         </div>
 
+        {/* Operational Role Selector */}
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-slate-400">
             <Lock className="h-3.5 w-3.5 text-[#2E9CCA]" />
-            <span>Select operational role & jurisdiction</span>
+            <span>SELECT YOUR ROLE</span>
           </label>
-          <select
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value as AppRole)}
-            className="w-full bg-[#0B1220] border border-[#2E9CCA]/30 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#2E9CCA]"
-          >
-            <option value="">— Choose a role —</option>
-            {ROLE_OPTIONS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label} — {r.description}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={selectedRole}
+              onChange={(e) => {
+                setSelectedRole(e.target.value as AppRole);
+                setAuthError('');
+              }}
+              className="w-full bg-[#0B1220] border border-[#2E9CCA]/30 rounded-lg px-3.5 py-3 text-sm text-white font-mono focus:outline-none focus:border-[#2E9CCA] cursor-pointer appearance-none transition-colors"
+            >
+              <option value="">— Choose a role —</option>
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r.value} value={r.value} className="bg-[#0F1A2E] text-white">
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+              </svg>
+            </div>
+          </div>
         </div>
 
+        {/* Primary Action: Sign in with Google */}
         <div className="space-y-3">
-          {/* Main Google Sign In Button */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            disabled={busy || !selectedRole}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all border bg-white text-[#0B1220] border-white hover:bg-slate-100 disabled:opacity-60"
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all bg-[#94A3B8] hover:bg-slate-200 text-[#0B1220] disabled:opacity-60 shadow-md group"
           >
             {busy ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#0B1220]" />
             ) : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"
@@ -262,129 +265,38 @@ export const LoginView: React.FC = () => {
                 />
               </svg>
             )}
-            <span>{busy ? 'Connecting to Google…' : 'Sign in with Google Account'}</span>
-            {!busy && <ArrowRight className="w-4 h-4" />}
-          </button>
-
-          {/* Quick Direct Officer Access */}
-          <div className="bg-[#121E36] border border-[#2E9CCA]/20 rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
-              <span className="text-[#2E9CCA] font-semibold">Designated Officer Sign-In:</span>
-              <button
-                type="button"
-                onClick={() => setShowDirectGoogle(!showDirectGoogle)}
-                className="text-[10px] text-slate-400 hover:text-white underline"
-              >
-                {showDirectGoogle ? 'Hide' : 'Change Email'}
-              </button>
-            </div>
-
-            {showDirectGoogle ? (
-              <div className="space-y-2 pt-1">
-                <input
-                  type="email"
-                  value={customEmail}
-                  onChange={(e) => setCustomEmail(e.target.value)}
-                  placeholder="officer@recq360.gov.in"
-                  className="w-full bg-[#0B1220] border border-white/20 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#2E9CCA]"
-                />
-              </div>
-            ) : (
-              <div className="text-[11px] font-mono text-slate-400 truncate">
-                Duty Account: <span className="text-white font-medium">{customEmail}</span>
-              </div>
+            <span>{busy ? 'Connecting to Google…' : 'Sign in with Google'}</span>
+            {!busy && (
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 text-[#0B1220]" />
             )}
-
-            <button
-              type="button"
-              onClick={handleDirectGoogleLogin}
-              disabled={!selectedRole}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-gradient-to-r from-[#2E9CCA]/80 to-[#7C5CFC]/80 hover:from-[#2E9CCA] hover:to-[#7C5CFC] text-white text-xs font-semibold font-mono transition-all disabled:opacity-50"
-            >
-              <span>Authenticate as {customEmail.split('@')[0]}</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-white/10"></div>
-            <span className="flex-shrink mx-2 text-[10px] font-mono text-slate-500 uppercase">or</span>
-            <div className="flex-grow border-t border-white/10"></div>
-          </div>
-
-          {/* Duty Station Direct Sign-In Button */}
-          <button
-            type="button"
-            onClick={handleDutyAccess}
-            disabled={!selectedRole}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-xs font-mono transition-all border border-[#2FBF71]/40 bg-[#2FBF71]/10 text-[#2FBF71] hover:bg-[#2FBF71]/20 disabled:opacity-50"
-          >
-            <span>Authorize Duty Station Access</span>
-            <ArrowRight className="w-3.5 h-3.5" />
           </button>
-
-          {/* Origin Mismatch Helper */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setShowOriginHelp(!showOriginHelp)}
-              className="w-full text-left text-[11px] font-mono text-amber-400/90 hover:text-amber-300 flex items-center justify-between"
-            >
-              <span>Seeing "Error 400: origin_mismatch"?</span>
-              <span className="text-[10px] underline">{showOriginHelp ? 'Close' : 'How to fix'}</span>
-            </button>
-
-            {showOriginHelp && (
-              <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[11px] font-mono text-slate-300 space-y-2">
-                <p className="text-amber-300 font-semibold">
-                  Google requires this URL to be registered:
-                </p>
-                <div className="flex items-center gap-2 bg-[#0B1220] p-1.5 rounded border border-white/10">
-                  <code className="text-cyan-300 text-[10px] flex-1 truncate">{currentOrigin}</code>
-                  <button
-                    type="button"
-                    onClick={handleCopyOrigin}
-                    className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white shrink-0"
-                  >
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <ol className="list-decimal list-inside space-y-1 text-[10px] text-slate-400">
-                  <li>
-                    Open{' '}
-                    <a
-                      href="https://console.cloud.google.com/apis/credentials"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-cyan-400 underline"
-                    >
-                      Google Cloud Console Credentials
-                    </a>
-                  </li>
-                  <li>Click your OAuth 2.0 Client ID: <code className="text-slate-300">392855055307...</code></li>
-                  <li>Under <b>Authorized JavaScript origins</b>, click <b>+ ADD URI</b></li>
-                  <li>Paste the copied URL above and click <b>SAVE</b></li>
-                </ol>
-                <p className="text-[10px] text-emerald-400 pt-1 border-t border-white/10">
-                  Tip: You can click "Continue as {customEmail.split('@')[0]}" above right now to enter immediately!
-                </p>
-              </div>
-            )}
-          </div>
 
           {authError && (
-            <div className="text-[11px] font-mono text-[#E4572E] bg-[#E4572E]/10 border border-[#E4572E]/30 rounded px-3 py-2">
+            <div className="text-[11px] font-mono text-[#E4572E] bg-[#E4572E]/10 border border-[#E4572E]/30 rounded-lg px-3 py-2 text-center">
               {authError}
             </div>
           )}
         </div>
 
-        <div className="pt-4 border-t border-white/5 flex items-start gap-2 text-[10px] text-slate-500 font-mono leading-relaxed">
+        {/* Audit Trail Note */}
+        <div className="pt-4 border-t border-white/5 flex items-start gap-2.5 text-[11px] text-slate-400 font-mono leading-relaxed">
           <ShieldCheck className="w-4 h-4 text-[#2FBF71] shrink-0 mt-0.5" />
           <span>
-            RECQ360 Disaster Management Command Center. All sign-ins and
-            operational overrides are recorded in the tamper-evident audit trail.
+            RECQ360 Disaster Management Command Center. All sign-ins and operational overrides are
+            recorded in the tamper-evident audit trail.
           </span>
+        </div>
+
+        {/* Back to Public Portal Link */}
+        <div className="text-center pt-2">
+          <button
+            type="button"
+            onClick={() => navigateTo('landing')}
+            className="inline-flex items-center gap-1.5 text-xs font-mono text-slate-400 hover:text-[#2E9CCA] transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Public Portal</span>
+          </button>
         </div>
       </div>
     </div>

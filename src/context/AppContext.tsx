@@ -288,13 +288,29 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('recq360_signed_out') === 'true') {
-      return false;
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('recq360_signed_out') === 'true') {
+        return false;
+      }
+      return !!localStorage.getItem('recq360_user');
     }
-    return true;
+    return false;
   });
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_OFFICER);
-  const [appRole, setAppRole] = useState<AppRole | null>('commissioner');
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('recq360_user');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return DEFAULT_OFFICER;
+  });
+  const [appRole, setAppRole] = useState<AppRole | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('cyclone360.selectedRole') as AppRole) || null;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState<boolean>(true);
 
   const [selectedStateId, setSelectedStateId] = useState<string>(() => {
@@ -364,8 +380,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
 
   const [activeTab, setActiveTab] = useState<string>(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('recq360_signed_out') === 'true') {
-      return 'landing';
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('recq360_signed_out') === 'true' || !localStorage.getItem('recq360_user')) {
+        return 'landing';
+      }
     }
     return 'dashboard';
   });
@@ -715,6 +733,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(DEFAULT_OFFICER);
     setActiveTab('landing');
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('recq360_user');
+      localStorage.removeItem('cyclone360.selectedRole');
       localStorage.setItem('recq360_signed_out', 'true');
     }
     toast.success('Signed out successfully.');
@@ -735,6 +755,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...(p.zoneId ? { zoneId: p.zoneId } : {}),
       ...(p.department ? { department: p.department } : {}),
     };
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('recq360_user', JSON.stringify(user));
+      localStorage.setItem('cyclone360.selectedRole', role);
+    }
     setAppRole(role);
     setCurrentUser(user);
     setIsAuthenticated(true);
@@ -758,6 +782,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .slice(0, 2)
             .toUpperCase(),
       };
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('recq360_signed_out');
+        localStorage.setItem('recq360_user', JSON.stringify(user));
+        localStorage.setItem('cyclone360.selectedRole', role);
+      }
       setAppRole(role);
       setCurrentUser(user);
       setIsAuthenticated(true);
