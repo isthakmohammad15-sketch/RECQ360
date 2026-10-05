@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { supabase } from '../integrations/supabase/client';
 import { ROLE_OPTIONS, type AppRole } from '../lib/roles';
 import { ShieldCheck, Radio, ArrowRight, Loader2, Lock, ArrowLeft } from 'lucide-react';
 
@@ -8,20 +7,27 @@ const GOOGLE_CLIENT_ID =
   (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_GOOGLE_CLIENT_ID']) ||
   '392855055307-dhehfd8fepvl20k85v57q785p8rv47h1.apps.googleusercontent.com';
 
-function parseJwt(token: string) {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(''),
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
+function waitForGoogleOAuth2(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).google?.accounts?.oauth2) {
+      return resolve((window as any).google.accounts.oauth2);
+    }
+    let count = 0;
+    const interval = setInterval(() => {
+      count++;
+      if ((window as any).google?.accounts?.oauth2) {
+        clearInterval(interval);
+        resolve((window as any).google.accounts.oauth2);
+      } else if (count > 50) {
+        clearInterval(interval);
+        reject(
+          new Error(
+            'Google Sign-In library could not be loaded. Please verify your internet connection.',
+          ),
+        );
+      }
+    }, 100);
+  });
 }
 
 export const LoginView: React.FC = () => {
@@ -32,74 +38,21 @@ export const LoginView: React.FC = () => {
   const roleRef = useRef<AppRole | ''>('');
   roleRef.current = selectedRole;
 
-  // Initialize Google Identity Services (GSI)
+  // Ensure Google Identity Services script is present
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    const initGsi = () => {
-      const g = (window as any).google;
-      if (!g?.accounts?.id) return;
-      try {
-        g.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: async (response: any) => {
-            if (!response?.credential) return;
-            setBusy(true);
-            try {
-              // 1. Try Supabase ID token login
-              try {
-                const { error } = await supabase.auth.signInWithIdToken({
-                  provider: 'google',
-                  token: response.credential,
-                });
-                if (!error) return; // Supabase onAuthStateChange handles session
-              } catch {
-                // Fallback to direct verified JWT
-              }
-
-              // 2. Decode verified Google JWT token directly
-              const payload = parseJwt(response.credential);
-              if (payload?.email) {
-                const role =
-                  roleRef.current ||
-                  (window.localStorage.getItem('cyclone360.selectedRole') as AppRole | null) ||
-                  'commissioner';
-
-                loginWithGoogleProfile(
-                  {
-                    email: payload.email,
-                    name: payload.name || payload.given_name || payload.email,
-                    avatarUrl: payload.picture,
-                  },
-                  role,
-                );
-              }
-            } catch (err) {
-              console.error('[Google GSI] Auth processing failed:', err);
-              setAuthError('Google sign-in could not be completed. Please try again.');
-            } finally {
-              setBusy(false);
-            }
-          },
-          auto_select: false,
-        });
-      } catch (e) {
-        console.warn('[Google GSI] Init notice:', e);
+    if (!(window as any).google?.accounts?.oauth2) {
+      const existing = document.getElementById('google-gsi-client');
+      if (!existing) {
+        const script = document.createElement('script');
+        script.id = 'google-gsi-client';
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
       }
-    };
-
-    if (!(window as any).google?.accounts?.id) {
-      const script = document.createElement('script');
-      script.id = 'google-gsi-client';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = initGsi;
-      document.body.appendChild(script);
-    } else {
-      initGsi();
     }
-  }, [loginWithGoogleProfile]);
+  }, []);
 
   const handleGoogleSignIn = async () => {
     if (!selectedRole) {
@@ -108,56 +61,88 @@ export const LoginView: React.FC = () => {
     }
     setAuthError('');
     setBusy(true);
+
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('cyclone360.selectedRole', selectedRole);
     }
 
     try {
-      // 1. Trigger Google GSI OneTap / Prompt
-      const g = (window as any).google;
-      let promptAttempted = false;
+      const oauth2 = await waitForGoogleOAuth2();
 
-      if (g?.accounts?.id) {
-        promptAttempted = true;
-        g.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
-            console.log('[Google Auth] GSI prompt skipped, falling back to Supabase OAuth redirect...');
-            void triggerSupabaseOAuth();
+      // Launch Google OAuth 2.0 Account Chooser Popup (Select Google Account Screen)
+      const tokenClient = oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope:
+          'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid',
+        prompt: 'select_account',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            console.error('[Google OAuth] Token error:', tokenResponse);
+            setAuthError(
+              tokenResponse.error_description ||
+                tokenResponse.error ||
+                'Google account selection was cancelled.',
+            );
+            setBusy(false);
+            return;
           }
-        });
-        setTimeout(() => setBusy(false), 2500);
-        return;
-      }
 
-      // 2. Fallback to Supabase OAuth redirect
-      if (!promptAttempted) {
-        await triggerSupabaseOAuth();
-      }
-    } catch (err: any) {
-      console.error('[Google Auth] Sign-in error:', err);
-      setAuthError(err.message || 'Google sign-in failed. Please try again.');
-      setBusy(false);
-    }
-  };
+          try {
+            // Retrieve verified user profile from Google UserInfo API
+            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: {
+                Authorization: `Bearer ${tokenResponse.access_token}`,
+              },
+            });
 
-  const triggerSupabaseOAuth = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account',
-          },
+            if (!res.ok) {
+              throw new Error(`Profile fetch returned status: ${res.status}`);
+            }
+
+            const profile = await res.json();
+
+            if (profile?.email) {
+              const role =
+                roleRef.current ||
+                (window.localStorage.getItem('cyclone360.selectedRole') as AppRole | null) ||
+                'commissioner';
+
+              loginWithGoogleProfile(
+                {
+                  email: profile.email,
+                  name: profile.name || profile.given_name || profile.email,
+                  avatarUrl: profile.picture,
+                },
+                role,
+              );
+            } else {
+              throw new Error('Google did not provide an email address.');
+            }
+          } catch (err: any) {
+            console.error('[Google OAuth] Failed to get user profile:', err);
+            setAuthError(err.message || 'Failed to retrieve profile from Google.');
+          } finally {
+            setBusy(false);
+          }
+        },
+        error_callback: (err: any) => {
+          console.warn('[Google OAuth] Client error:', err);
+          setBusy(false);
+          if (err?.type === 'popup_blocked') {
+            setAuthError(
+              'Pop-up window was blocked by your browser. Please allow pop-ups for this site to choose your Google account.',
+            );
+          } else if (err?.type !== 'popup_closed') {
+            setAuthError(err?.message || 'Google Sign-In encountered an issue.');
+          }
         },
       });
-      if (error) {
-        setAuthError(error.message || 'Google sign-in could not be initiated.');
-        setBusy(false);
-      }
-    } catch (e: any) {
-      setAuthError(e.message || 'Could not connect to Google authentication.');
+
+      // Request Google Account Chooser screen
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
+    } catch (err: any) {
+      console.error('[Google Auth] Sign-in error:', err);
+      setAuthError(err.message || 'Google sign-in could not be initiated.');
       setBusy(false);
     }
   };
