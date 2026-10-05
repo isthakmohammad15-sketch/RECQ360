@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788587136239,
+      "tag": "0000_recq360_core_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788587217657,
+      "tag": "0001_recq360_roles_notifications_contacts_security",
+      "breakpoints": true
+    }
+  ]
+}
