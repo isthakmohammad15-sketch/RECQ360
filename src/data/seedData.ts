@@ -10,6 +10,24 @@ import {
   User,
 } from '../types';
 
+export const formatLiveTimestamp = (minutesAgo = 0): string => {
+  const d = new Date(Date.now() - minutesAgo * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} IST`;
+};
+
+export const formatLiveDate = (daysAgo = 0): string => {
+  const d = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 export const MOCK_USERS: User[] = [
   {
     id: 'usr-1',
@@ -477,13 +495,13 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-4',
     zoneName: 'Zone 4 - Seethammadhara',
     status: 'critical',
-    lastInspectionDate: '2026-07-29',
+    lastInspectionDate: formatLiveDate(0),
     operator: 'M. Kondal Rao (Pumps Specialist)',
     location: 'HB Colony Low-Lying Storm Sump',
     coordinates: [17.7315, 83.3060],
     maintenanceHistory: [
-      { id: 'm-1', date: '2026-07-29', type: 'Failure Report', notes: 'Impeller jammed with silt. Diesel starter switch un-responsive.', technician: 'Central Workshop' },
-      { id: 'm-2', date: '2026-06-15', type: 'Routine Service', notes: 'Engine oil changed and filter replaced.', technician: 'Kirloskar Service Team' }
+      { id: 'm-1', date: formatLiveDate(0), type: 'Failure Report', notes: 'Impeller jammed with silt. Diesel starter switch un-responsive.', technician: 'Central Workshop' },
+      { id: 'm-2', date: formatLiveDate(14), type: 'Routine Service', notes: 'Engine oil changed and filter replaced.', technician: 'Kirloskar Service Team' }
     ],
   },
   {
@@ -494,12 +512,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-4',
     zoneName: 'Zone 4 - Seethammadhara',
     status: 'critical',
-    lastInspectionDate: '2026-07-28',
+    lastInspectionDate: formatLiveDate(1),
     operator: 'K. Someswara Rao',
     location: 'Seethammadhara High School Shelter',
     coordinates: [17.7305, 83.3040],
     maintenanceHistory: [
-      { id: 'm-3', date: '2026-07-28', type: 'Battery Failure', notes: '12V starter battery dead. Replacement dispatch requested.', technician: 'APEPDCL Grid Unit' }
+      { id: 'm-3', date: formatLiveDate(1), type: 'Battery Failure', notes: '12V starter battery dead. Replacement dispatch requested.', technician: 'APEPDCL Grid Unit' }
     ],
   },
   {
@@ -510,12 +528,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-7',
     zoneName: 'Zone 7 - Gopalapatnam',
     status: 'critical',
-    lastInspectionDate: '2026-07-30',
+    lastInspectionDate: formatLiveDate(0),
     operator: 'S. Narayana',
     location: 'NAD Underpass Storm Channel',
     coordinates: [17.7385, 83.2295],
     maintenanceHistory: [
-      { id: 'm-4', date: '2026-07-30', type: 'Overheating Alert', notes: 'Coil insulation thermal trip activated.', technician: 'Zonal Maintenance' }
+      { id: 'm-4', date: formatLiveDate(0), type: 'Overheating Alert', notes: 'Coil insulation thermal trip activated.', technician: 'Zonal Maintenance' }
     ],
   },
   {
@@ -526,12 +544,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-3',
     zoneName: 'Zone 3 - MVP Colony & Coastal',
     status: 'ready',
-    lastInspectionDate: '2026-07-30',
+    lastInspectionDate: formatLiveDate(0),
     operator: 'NDRF Team Bravo - Commander S. Das',
     location: 'Lawsons Bay Lifeguard Station',
     coordinates: [17.7430, 83.3330],
     maintenanceHistory: [
-      { id: 'm-5', date: '2026-07-25', type: 'Outboard Test', notes: 'Mercury 40HP 2-stroke tested at 35 knots. Hull pressure intact.', technician: 'NDRF Tech Base' }
+      { id: 'm-5', date: formatLiveDate(3), type: 'Outboard Test', notes: 'Mercury 40HP 2-stroke tested at 35 knots. Hull pressure intact.', technician: 'NDRF Tech Base' }
     ],
   },
   {
@@ -542,12 +560,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-5',
     zoneName: 'Zone 5 - Jagadamba & Port Belt',
     status: 'ready',
-    lastInspectionDate: '2026-07-29',
+    lastInspectionDate: formatLiveDate(1),
     operator: 'P. Prasad (Heavy Machine)',
     location: 'Port Flyover Clearance Base',
     coordinates: [17.7125, 83.2985],
     maintenanceHistory: [
-      { id: 'm-6', date: '2026-07-20', type: 'Hydraulic Fluid Check', notes: 'Line pressure adjusted, bucket teeth replaced.', technician: 'L&T Construction Unit' }
+      { id: 'm-6', date: formatLiveDate(7), type: 'Hydraulic Fluid Check', notes: 'Line pressure adjusted, bucket teeth replaced.', technician: 'L&T Construction Unit' }
     ],
   },
   {
@@ -558,12 +576,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-2',
     zoneName: 'Zone 2 - Madhurawada',
     status: 'ready',
-    lastInspectionDate: '2026-07-30',
+    lastInspectionDate: formatLiveDate(0),
     operator: '108 Emergency Medical Response',
     location: 'Gitam Medical College Emergency Base',
     coordinates: [17.8185, 83.3525],
     maintenanceHistory: [
-      { id: 'm-7', date: '2026-07-30', type: 'Oxygen Tank Audit', notes: 'Oxygen cylinders refilled (2x 47L), defibrillator recalibrated.', technician: '108 Fleet Services' }
+      { id: 'm-7', date: formatLiveDate(0), type: 'Oxygen Tank Audit', notes: 'Oxygen cylinders refilled (2x 47L), defibrillator recalibrated.', technician: '108 Fleet Services' }
     ],
   },
   {
@@ -574,12 +592,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-1',
     zoneName: 'Zone 1 - Bheemunipatnam',
     status: 'ready',
-    lastInspectionDate: '2026-07-29',
+    lastInspectionDate: formatLiveDate(1),
     operator: 'Urban Forestry Unit 1',
     location: 'Tagarapuvalasa Fire Station',
     coordinates: [17.8895, 83.4355],
     maintenanceHistory: [
-      { id: 'm-8', date: '2026-07-28', type: 'Chain Sharpening', notes: 'Chains sharpened and oil reservoir topped.', technician: 'Fire & Emergency Services' }
+      { id: 'm-8', date: formatLiveDate(2), type: 'Chain Sharpening', notes: 'Chains sharpened and oil reservoir topped.', technician: 'Fire & Emergency Services' }
     ],
   },
   {
@@ -590,12 +608,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-9',
     zoneName: 'Zone 9 - Anakapalle North',
     status: 'maintenance',
-    lastInspectionDate: '2026-07-29',
+    lastInspectionDate: formatLiveDate(1),
     operator: 'MRO Rural Control Office',
     location: 'Anakapalle Revenue Division',
     coordinates: [17.6895, 83.0025],
     maintenanceHistory: [
-      { id: 'm-9', date: '2026-07-29', type: 'SIM Auth Renewal', notes: 'Satellite SIM authorization pending sync with ISRO earth station.', technician: 'BSNL Telecom Unit' }
+      { id: 'm-9', date: formatLiveDate(1), type: 'SIM Auth Renewal', notes: 'Satellite SIM authorization pending sync with ISRO earth station.', technician: 'BSNL Telecom Unit' }
     ],
   },
   {
@@ -606,12 +624,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-6',
     zoneName: 'Zone 6 - Gajuwaka Industrial',
     status: 'ready',
-    lastInspectionDate: '2026-07-30',
+    lastInspectionDate: formatLiveDate(0),
     operator: 'B. Appa Rao',
     location: 'Gajuwaka Water Pumping Station',
     coordinates: [17.6895, 83.2185],
     maintenanceHistory: [
-      { id: 'm-10', date: '2026-07-27', type: 'Full Fuel Tank Fill', notes: '1,000 Liters high speed diesel refilled and load tested.', technician: 'HPCL Energy Wing' }
+      { id: 'm-10', date: formatLiveDate(2), type: 'Full Fuel Tank Fill', notes: '1,000 Liters high speed diesel refilled and load tested.', technician: 'HPCL Energy Wing' }
     ],
   },
   {
@@ -622,12 +640,12 @@ export const INITIAL_ASSETS: Asset[] = [
     zoneId: 'zone-10',
     zoneName: 'Zone 10 - Gangavaram & Steel Plant',
     status: 'ready',
-    lastInspectionDate: '2026-07-30',
+    lastInspectionDate: formatLiveDate(0),
     operator: 'Marine Police Unit - Sub-Inspector Rao',
     location: 'Gangavaram Jetty Station',
     coordinates: [17.6255, 83.1895],
     maintenanceHistory: [
-      { id: 'm-11', date: '2026-07-29', type: 'Navigation Light Test', notes: 'GPS & Marine VHF Radio operating on Channel 16.', technician: 'Visakhapatnam Port Authority' }
+      { id: 'm-11', date: formatLiveDate(1), type: 'Navigation Light Test', notes: 'GPS & Marine VHF Radio operating on Channel 16.', technician: 'Visakhapatnam Port Authority' }
     ],
   },
 ];
@@ -789,7 +807,7 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     zoneName: 'Zone 3 - MVP Colony & Coastal',
     officerName: 'M. Satish (Water Dept Inspector)',
     department: 'Water Supply & Drainage',
-    timestamp: '2026-07-30 10:15 IST',
+    timestamp: formatLiveTimestamp(18),
     gpsCoordinates: '17.7428° N, 83.3328° E',
     photoUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=300&q=80',
     remarks: 'Tested 2x 25HP de-watering pumps at Beach Road storm outlet. Fuel tank at 100%. Flow clearance verified.',
@@ -802,7 +820,7 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     zoneName: 'Zone 4 - Seethammadhara',
     officerName: 'P. Kondandarami (Electrical Safety)',
     department: 'Power & DISCOM',
-    timestamp: '2026-07-30 09:42 IST',
+    timestamp: formatLiveTimestamp(42),
     gpsCoordinates: '17.7311° N, 83.3051° E',
     photoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=300&q=80',
     remarks: 'FLAGGED: Battery terminal corrosion on 125KVA generator at HB Colony shelter. Genset failed auto-start test.',
@@ -815,7 +833,7 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     zoneName: 'Zone 2 - Madhurawada',
     officerName: 'Dr. V. Rajesh (Health Inspector)',
     department: 'Health & Medical',
-    timestamp: '2026-07-30 09:10 IST',
+    timestamp: formatLiveTimestamp(85),
     gpsCoordinates: '17.8181° N, 83.3521° E',
     photoUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=300&q=80',
     remarks: 'Stocked 500 ORS packets, 2,000 chlorine purification tablets, and snake venom antiserum at Mithilapuri shelter.',
@@ -828,7 +846,7 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     zoneName: 'Zone 6 - Gajuwaka Industrial',
     officerName: 'K. Trimurtulu (Roads & JCB)',
     department: 'Roads & Drainage',
-    timestamp: '2026-07-30 08:30 IST',
+    timestamp: formatLiveTimestamp(130),
     gpsCoordinates: '17.6891° N, 83.2181° E',
     photoUrl: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=300&q=80',
     remarks: 'Cleared debris under Gajuwaka flyover culvert. JCB assigned on standby at Mindi junction.',
@@ -841,7 +859,7 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     zoneName: 'Zone 7 - Gopalapatnam',
     officerName: 'S. Prasad (Fire Officer)',
     department: 'Fire & Rescue',
-    timestamp: '2026-07-30 08:05 IST',
+    timestamp: formatLiveTimestamp(210),
     gpsCoordinates: '17.7381° N, 83.2291° E',
     photoUrl: 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?auto=format&fit=crop&w=300&q=80',
     remarks: 'FLAGGED: 2 chainsaws missing extra saw chains. Replacement request submitted to central store.',
@@ -858,7 +876,7 @@ export const INITIAL_ALERTS: AlertItem[] = [
     zoneId: 'zone-4',
     zoneName: 'Zone 4 - Seethammadhara',
     severity: 'critical',
-    timestamp: '2026-07-30 09:42 IST',
+    timestamp: formatLiveTimestamp(15),
     resolved: false,
     department: 'Power & DISCOM',
   },
@@ -869,7 +887,7 @@ export const INITIAL_ALERTS: AlertItem[] = [
     zoneId: 'zone-4',
     zoneName: 'Zone 4 - Seethammadhara',
     severity: 'critical',
-    timestamp: '2026-07-30 09:15 IST',
+    timestamp: formatLiveTimestamp(35),
     resolved: false,
     department: 'Water Supply & Drainage',
   },
@@ -880,7 +898,7 @@ export const INITIAL_ALERTS: AlertItem[] = [
     zoneId: 'zone-7',
     zoneName: 'Zone 7 - Gopalapatnam',
     severity: 'critical',
-    timestamp: '2026-07-30 08:50 IST',
+    timestamp: formatLiveTimestamp(65),
     resolved: false,
     department: 'Water Supply & Drainage',
   },
@@ -891,7 +909,7 @@ export const INITIAL_ALERTS: AlertItem[] = [
     zoneId: 'zone-9',
     zoneName: 'Zone 9 - Anakapalle North',
     severity: 'warning',
-    timestamp: '2026-07-30 07:30 IST',
+    timestamp: formatLiveTimestamp(120),
     resolved: false,
     department: 'Disaster Cell & Comms',
   },
@@ -902,7 +920,7 @@ export const INITIAL_ALERTS: AlertItem[] = [
     zoneId: 'zone-6',
     zoneName: 'Zone 6 - Gajuwaka Industrial',
     severity: 'warning',
-    timestamp: '2026-07-30 06:10 IST',
+    timestamp: formatLiveTimestamp(180),
     resolved: false,
     department: 'Welfare & Shelters',
   },
@@ -913,11 +931,11 @@ export const INITIAL_ALERTS: AlertItem[] = [
     zoneId: 'zone-1',
     zoneName: 'Zone 1 - Bheemunipatnam',
     severity: 'info',
-    timestamp: '2026-07-29 18:00 IST',
+    timestamp: formatLiveTimestamp(360),
     resolved: true,
     department: 'Roads & Drainage',
-    actionTaken: 'Verified by Zonal Commissioner 1 at 18:15 IST',
-    resolvedAt: '2026-07-29 18:15 IST',
+    actionTaken: 'Verified by Zonal Commissioner 1',
+    resolvedAt: formatLiveTimestamp(345),
   },
 ];
 
@@ -932,51 +950,60 @@ export const INITIAL_DEPARTMENT_STATS: DepartmentProgress[] = [
 ];
 
 export const READINESS_TREND_DATA = [
-  { day: 'Day -6', readiness: 42, criticalAlerts: 24, inspectionsCompleted: 35 },
-  { day: 'Day -5', readiness: 49, criticalAlerts: 19, inspectionsCompleted: 52 },
-  { day: 'Day -4', readiness: 58, criticalAlerts: 15, inspectionsCompleted: 78 },
-  { day: 'Day -3', readiness: 65, criticalAlerts: 11, inspectionsCompleted: 110 },
-  { day: 'Day -2', readiness: 71, criticalAlerts: 8, inspectionsCompleted: 145 },
-  { day: 'Day -1', readiness: 75, criticalAlerts: 5, inspectionsCompleted: 182 },
+  { day: formatLiveDate(6), readiness: 42, criticalAlerts: 24, inspectionsCompleted: 35 },
+  { day: formatLiveDate(5), readiness: 49, criticalAlerts: 19, inspectionsCompleted: 52 },
+  { day: formatLiveDate(4), readiness: 58, criticalAlerts: 15, inspectionsCompleted: 78 },
+  { day: formatLiveDate(3), readiness: 65, criticalAlerts: 11, inspectionsCompleted: 110 },
+  { day: formatLiveDate(2), readiness: 71, criticalAlerts: 8, inspectionsCompleted: 145 },
+  { day: 'Yesterday', readiness: 75, criticalAlerts: 5, inspectionsCompleted: 182 },
   { day: 'Today (Live)', readiness: 78, criticalAlerts: 3, inspectionsCompleted: 214 },
 ];
 
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   {
     id: 'log-101',
-    timestamp: '2026-07-30 10:20:15 IST',
+    timestamp: formatLiveTimestamp(5),
     user: 'Shri C.M. Trivikram, IAS',
     role: 'Commissioner',
-    action: 'Logged into Command Center',
-    details: 'Initiated city-wide readiness review session.',
+    action: 'Command Session Active',
+    details: 'Reviewed city-wide tactical readiness across 10 municipal zones.',
     type: 'auth',
   },
   {
     id: 'log-102',
-    timestamp: '2026-07-30 09:45:10 IST',
+    timestamp: formatLiveTimestamp(25),
     user: 'P. Kondandarami',
     role: 'Dept Officer',
-    action: 'Submitted Flagged Inspection',
-    details: 'Flagged Genset CYC360-GEN-9021 in Zone 4 Seethammadhara.',
+    action: 'Submitted Field Telemetry',
+    details: 'Flagged Genset CYC360-GEN-9021 in Zone 4 Seethammadhara for starter battery replacement.',
     type: 'asset_update',
   },
   {
     id: 'log-103',
-    timestamp: '2026-07-30 08:15:30 IST',
+    timestamp: formatLiveTimestamp(50),
     user: 'Sri B. Appala Naidu',
     role: 'Zone Officer',
-    action: 'Marked Alert Resolved',
-    details: 'Resolved coastal barrier sandbag alert in Zone 1 Bheemili.',
+    action: 'Marked Barrier Operational',
+    details: 'Verified coastal sandbag sea-wall completion along Bheemili Fisherman Colony.',
     type: 'alert_action',
   },
   {
     id: 'log-104',
-    timestamp: '2026-07-29 17:30:00 IST',
+    timestamp: formatLiveTimestamp(115),
     user: 'Smt. D. Sunitha, APCS',
     role: 'Admin',
     action: 'Updated Checklist Template',
-    details: 'Added mandatory GPS coordinate & photo requirement for De-watering pumps.',
+    details: 'Enforced GPS coordinate & geotagged photo verification for coastal pumps.',
     type: 'template_update',
+  },
+  {
+    id: 'log-105',
+    timestamp: formatLiveTimestamp(180),
+    user: 'Dr. P. Suresh Kumar',
+    role: 'Disaster Officer',
+    action: 'IMD Doppler Radar Sync',
+    details: 'Synchronized live radar telemetry for Bay of Bengal cyclone track advisory.',
+    type: 'alert_action',
   },
 ];
 

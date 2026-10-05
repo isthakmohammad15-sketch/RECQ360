@@ -168,7 +168,7 @@ export const ZoneDetailView: React.FC = () => {
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-slate-400 flex items-center gap-1">
                 <Sliders className="w-3.5 h-3.5 text-[#2E9CCA]" />
-                Simulate Field Inspection Verification
+                Adjust Operational Readiness Rating
               </span>
               <span className="text-white">{currentZone.readinessScore}%</span>
             </div>

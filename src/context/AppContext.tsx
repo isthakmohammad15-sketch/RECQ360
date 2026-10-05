@@ -25,8 +25,16 @@ import {
 } from '../lib/mappers';
 import { type AppRole, toUiRole, roleLabel, EDITOR_ROLES } from '../lib/roles';
 import { permissionsFor, type Permissions } from '../lib/permissions';
-import { toast } from 'sonner';
-import { INITIAL_ZONES, INITIAL_ALERTS, INITIAL_DEPARTMENT_STATS } from '../data/seedData';
+import {
+  INITIAL_ZONES,
+  INITIAL_ALERTS,
+  INITIAL_DEPARTMENT_STATS,
+  INITIAL_ASSETS,
+  INITIAL_SHELTERS,
+  INITIAL_INSPECTIONS,
+  INITIAL_AUDIT_LOGS,
+  INITIAL_CHECKLIST_TEMPLATES,
+} from '../data/seedData';
 
 const STORAGE_PREFIX = 'cyclone360.local_';
 const DELETED_PREFIX = 'cyclone360.deleted_';
@@ -118,13 +126,82 @@ export interface DirectoryUser {
   department: string | null;
 }
 
-const GUEST_USER: User = {
-  id: 'guest',
-  name: 'Guest Observer',
-  role: 'dept_officer',
-  email: '',
-  title: 'Read-only Preview',
-  avatar: 'GO',
+export const OFFICER_PROFILES: Record<
+  AppRole,
+  { name: string; title: string; email: string; avatar: string; zoneId?: string; department?: string }
+> = {
+  commissioner: {
+    name: 'Shri C.M. Trivikram, IAS',
+    title: 'Municipal Commissioner & Incident Commander',
+    email: 'commissioner@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+  },
+  deputy_commissioner: {
+    name: 'Dr. G. Ramanjaneyulu, APCS',
+    title: 'Deputy Municipal Commissioner',
+    email: 'deputy.commissioner@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+  },
+  disaster_officer: {
+    name: 'Dr. P. Suresh Kumar',
+    title: 'Chief Disaster Management Officer',
+    email: 'disaster.cell@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+    department: 'Disaster Cell & Comms',
+  },
+  zone_officer: {
+    name: 'Sri K. Venkat Rao',
+    title: 'Zonal Commissioner — Zone 3 (MVP Coastal Belt)',
+    email: 'zo.zone3@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    zoneId: 'zone-3',
+  },
+  dept_officer: {
+    name: 'Er. M. Rajasekhar',
+    title: 'Superintending Engineer (Water Supply & Pumps)',
+    email: 'water.supt@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+    department: 'Water Supply & Drainage',
+  },
+  field_inspector: {
+    name: 'Inspector B. Ramesh',
+    title: 'Senior Field Verification Officer',
+    email: 'field.inspection@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=150&q=80',
+  },
+  shelter_manager: {
+    name: 'Sri V. Anand',
+    title: 'Chief Relief Shelters Coordinator',
+    email: 'shelters@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
+  },
+  asset_manager: {
+    name: 'Er. T. Ravi Teja',
+    title: 'Heavy Assets & Telemetry In-Charge',
+    email: 'assets@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+  },
+  volunteer: {
+    name: 'K. Sai Kiran',
+    title: 'Civil Defence Emergency Volunteer',
+    email: 'volunteer.ops@recq360.gov.in',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+  },
+  viewer: {
+    name: 'Public Operations Observer',
+    title: 'Command Center Observer (Live Feed)',
+    email: 'observer@gvmc.gov.in',
+    avatar: 'PO',
+  },
+};
+
+const DEFAULT_OFFICER: User = {
+  id: 'officer-commissioner',
+  name: 'Shri C.M. Trivikram, IAS',
+  role: 'commissioner',
+  email: 'commissioner@recq360.gov.in',
+  title: 'Municipal Commissioner & Incident Commander',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
 };
 
 interface AppContextType {
@@ -254,7 +331,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 2. ASSETS
       const deletedAssetIds = getDeletedRecordIds('assets');
       const localAssets = getLocalRecords('assets');
-      const baseAssets = (a.data || []).map(mapAsset).filter((item) => !deletedAssetIds.has(item.id));
+      const baseAssets = (a.data && a.data.length > 0 ? a.data.map(mapAsset) : INITIAL_ASSETS).filter(
+        (item) => !deletedAssetIds.has(item.id)
+      );
       const mergedAssetsMap = new Map<string, Asset>();
       baseAssets.forEach((item) => mergedAssetsMap.set(item.id, item));
       localAssets.forEach((r) => {
@@ -267,7 +346,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 3. SHELTERS
       const deletedShelterIds = getDeletedRecordIds('shelters');
       const localShelters = getLocalRecords('shelters');
-      const baseShelters = (s.data || []).map(mapShelter).filter((item) => !deletedShelterIds.has(item.id));
+      const baseShelters = (s.data && s.data.length > 0 ? s.data.map(mapShelter) : INITIAL_SHELTERS).filter(
+        (item) => !deletedShelterIds.has(item.id)
+      );
       const mergedSheltersMap = new Map<string, Shelter>();
       baseShelters.forEach((item) => mergedSheltersMap.set(item.id, item));
       localShelters.forEach((r) => {
@@ -279,7 +360,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 4. INSPECTIONS
       const localInspections = getLocalRecords('inspections');
-      const baseInspections = (i.data || []).map(mapInspection);
+      const baseInspections = i.data && i.data.length > 0 ? i.data.map(mapInspection) : INITIAL_INSPECTIONS;
       const mergedInspectionsMap = new Map<string, InspectionRecord>();
       baseInspections.forEach((item) => mergedInspectionsMap.set(item.id, item));
       localInspections.forEach((r) => mergedInspectionsMap.set(r.id, mapInspection(r)));
@@ -301,7 +382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 6. AUDIT LOGS
       const localLogs = getLocalRecords('audit_logs');
-      const baseLogs = (lg.data || []).map(mapAuditLog);
+      const baseLogs = lg.data && lg.data.length > 0 ? lg.data.map(mapAuditLog) : INITIAL_AUDIT_LOGS;
       const mergedLogsMap = new Map<string, AuditLog>();
       baseLogs.forEach((item) => mergedLogsMap.set(item.id, item));
       localLogs.forEach((r) => mergedLogsMap.set(r.id, mapAuditLog(r)));
@@ -309,7 +390,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 7. CHECKLIST TEMPLATES
       const localTemplates = getLocalRecords('checklist_templates');
-      const baseTemplates = (ct.data || []).map(mapChecklist);
+      const baseTemplates = ct.data && ct.data.length > 0 ? ct.data.map(mapChecklist) : INITIAL_CHECKLIST_TEMPLATES;
       const mergedTemplatesMap = new Map<string, ChecklistItem>();
       baseTemplates.forEach((item) => mergedTemplatesMap.set(item.id, item));
       localTemplates.forEach((r) => mergedTemplatesMap.set(r.id, mapChecklist(r)));
@@ -509,7 +590,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         setIsAuthenticated(false);
         setAppRole(null);
-        setCurrentUser(GUEST_USER);
+        setCurrentUser(DEFAULT_OFFICER);
         setActiveTab('login');
       }
     });
@@ -525,21 +606,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [hydrateSession, loadAll]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut().catch(() => {});
     setIsAuthenticated(false);
     setAppRole(null);
-    setCurrentUser(GUEST_USER);
+    setCurrentUser(DEFAULT_OFFICER);
     setActiveTab('login');
   };
 
   const loginAsGuest = useCallback((role: AppRole) => {
+    const p = OFFICER_PROFILES[role] || OFFICER_PROFILES.commissioner;
     const user: User = {
-      id: 'demo-officer',
-      name: `Field Officer (${roleLabel(role)})`,
+      id: `officer-${role}`,
+      name: p.name,
       role: toUiRole(role),
-      email: 'officer@gvmc.gov.in',
-      title: roleLabel(role),
-      avatar: 'FO',
+      email: p.email,
+      title: p.title,
+      avatar: p.avatar,
+      ...(p.zoneId ? { zoneId: p.zoneId } : {}),
+      ...(p.department ? { department: p.department } : {}),
     };
     setAppRole(role);
     setCurrentUser(user);

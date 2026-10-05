@@ -162,15 +162,15 @@ export const TopBar: React.FC = () => {
           )}
         </button>
 
-        {/* Simulated Trigger Alert Button for Demo */}
+        {/* Field Advisory Broadcast Button */}
         {perms.raiseAlerts && (
         <button
           onClick={triggerSimulatedAlert}
           className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-[#E4572E]/15 hover:bg-[#E4572E]/25 border border-[#E4572E]/40 text-[#E4572E] text-xs font-mono transition-colors"
-          title="Simulate Telemetry Wind Alert"
+          title="Dispatch Live Coastal Telemetry Advisory"
         >
-          <ShieldAlert className="w-3.5 h-3.5" />
-          <span>Test Alert</span>
+          <Radio className="w-3.5 h-3.5 animate-pulse" />
+          <span>Broadcast Advisory</span>
         </button>
         )}
 

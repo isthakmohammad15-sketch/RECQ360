@@ -29,8 +29,8 @@ export const LoginView: React.FC = () => {
   const { loading, loginAsGuest, loginWithGoogleProfile } = useApp();
   const [authError, setAuthError] = useState<string>('');
   const [busy, setBusy] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<AppRole | ''>('');
-  const roleRef = useRef<AppRole | ''>('');
+  const [selectedRole, setSelectedRole] = useState<AppRole | ''>('commissioner');
+  const roleRef = useRef<AppRole | ''>('commissioner');
   roleRef.current = selectedRole;
 
   useEffect(() => {
@@ -171,7 +171,7 @@ export const LoginView: React.FC = () => {
     setShowOriginHelp(true);
   };
 
-  const handleQuickDemo = () => {
+  const handleDutyAccess = () => {
     if (!selectedRole) {
       setAuthError('Select your operational role first.');
       return;
@@ -202,21 +202,21 @@ export const LoginView: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2FBF71]/10 border border-[#2FBF71]/30 font-mono text-[10px] text-[#2FBF71]">
             <Radio className="w-3 h-3 animate-pulse" />
             <span>
-              {loading ? 'SYNCING LIVE OPERATIONAL DATA…' : 'LIVE SYSTEM ONLINE • REAL-TIME SYNC'}
+              {loading ? 'CONNECTING TO OPERATIONAL GRID…' : 'LIVE SYSTEM ONLINE • REAL-TIME TELEMETRY'}
             </span>
           </div>
 
           <p className="text-xs text-slate-400 leading-relaxed">
-            Secure access to the Greater Visakhapatnam cyclone preparedness grid.
+            Government of Andhra Pradesh • Greater Visakhapatnam Municipal Corporation
             <br />
-            Sign in with your Google account or Launch Instant Evaluation.
+            <span className="text-slate-300 font-medium">Unified Disaster Preparedness & Field Response Grid</span>
           </p>
         </div>
 
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-slate-400">
             <Lock className="h-3.5 w-3.5 text-[#2E9CCA]" />
-            <span>Select your operational role</span>
+            <span>Select operational role & jurisdiction</span>
           </label>
           <select
             value={selectedRole}
@@ -262,14 +262,14 @@ export const LoginView: React.FC = () => {
                 />
               </svg>
             )}
-            <span>{busy ? 'Connecting to Google…' : 'Sign in with Google'}</span>
+            <span>{busy ? 'Connecting to Google…' : 'Sign in with Google Account'}</span>
             {!busy && <ArrowRight className="w-4 h-4" />}
           </button>
 
-          {/* Quick Direct Google Login with User's Email */}
+          {/* Quick Direct Officer Access */}
           <div className="bg-[#121E36] border border-[#2E9CCA]/20 rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
-              <span className="text-[#2E9CCA] font-semibold">Immediate Google Access:</span>
+              <span className="text-[#2E9CCA] font-semibold">Designated Officer Sign-In:</span>
               <button
                 type="button"
                 onClick={() => setShowDirectGoogle(!showDirectGoogle)}
@@ -285,13 +285,13 @@ export const LoginView: React.FC = () => {
                   type="email"
                   value={customEmail}
                   onChange={(e) => setCustomEmail(e.target.value)}
-                  placeholder="your-email@gmail.com"
+                  placeholder="officer@recq360.gov.in"
                   className="w-full bg-[#0B1220] border border-white/20 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#2E9CCA]"
                 />
               </div>
             ) : (
               <div className="text-[11px] font-mono text-slate-400 truncate">
-                Account: <span className="text-white font-medium">{customEmail}</span>
+                Duty Account: <span className="text-white font-medium">{customEmail}</span>
               </div>
             )}
 
@@ -301,7 +301,7 @@ export const LoginView: React.FC = () => {
               disabled={!selectedRole}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-gradient-to-r from-[#2E9CCA]/80 to-[#7C5CFC]/80 hover:from-[#2E9CCA] hover:to-[#7C5CFC] text-white text-xs font-semibold font-mono transition-all disabled:opacity-50"
             >
-              <span>Continue as {customEmail.split('@')[0]}</span>
+              <span>Authenticate as {customEmail.split('@')[0]}</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -312,14 +312,14 @@ export const LoginView: React.FC = () => {
             <div className="flex-grow border-t border-white/10"></div>
           </div>
 
-          {/* Quick Evaluation Demo Button */}
+          {/* Duty Station Direct Sign-In Button */}
           <button
             type="button"
-            onClick={handleQuickDemo}
+            onClick={handleDutyAccess}
             disabled={!selectedRole}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-xs font-mono transition-all border border-[#2FBF71]/40 bg-[#2FBF71]/10 text-[#2FBF71] hover:bg-[#2FBF71]/20 disabled:opacity-50"
           >
-            <span>Launch Quick Evaluation / Demo Access</span>
+            <span>Authorize Duty Station Access</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
 

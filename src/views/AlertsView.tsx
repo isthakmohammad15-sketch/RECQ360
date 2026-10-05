@@ -48,7 +48,7 @@ export const AlertsView: React.FC = () => {
           className="px-4 py-2 rounded bg-[#E4572E]/20 hover:bg-[#E4572E]/30 border border-[#E4572E]/40 text-[#E4572E] font-mono text-xs font-bold flex items-center gap-2 glow-red shrink-0"
         >
           <Radio className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
-          <span>Trigger Test Advisory</span>
+          <span>Broadcast Field Advisory</span>
         </button>
         )}
         </div>
