@@ -710,7 +710,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAuthenticated(false);
         setAppRole(null);
         setCurrentUser(DEFAULT_OFFICER);
-        setActiveTab('login');
       }
     });
 
