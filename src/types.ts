@@ -106,6 +106,11 @@ export interface Asset {
   location: string;
   coordinates: [number, number];
   maintenanceHistory: MaintenanceRecord[];
+  department?: string;
+  fuelLevel?: number;
+  operatorName?: string;
+  operatorContact?: string;
+  lastMaintenance?: string;
 }
 
 export interface ShelterAmenities {
@@ -130,6 +135,9 @@ export interface Shelter {
   contactPhone: string;
   status: 'operational' | 'near-capacity' | 'preparing';
   amenities: ShelterAmenities;
+  foodWaterStatus?: string;
+  medicalSupport?: boolean | string;
+  generatorBackup?: boolean;
 }
 
 export interface InspectionRecord {
@@ -153,11 +161,12 @@ export interface AlertItem {
   zoneId: string;
   zoneName: string;
   severity: 'critical' | 'warning' | 'info';
-  timestamp: string;
+  timestamp?: string;
   resolved: boolean;
   department: string;
   actionTaken?: string;
   resolvedAt?: string;
+  createdAt?: string;
 }
 
 export interface AuditLog {
@@ -222,10 +231,10 @@ export interface DisasterCity {
   advisorySeverity: 'critical' | 'warning' | 'info';
   readinessScore: number;
   zones: Zone[];
-  shelters: Shelter[];
-  assets: Asset[];
+  shelters: any[];
+  assets: any[];
   hotspots: Array<{ id: string; name: string; lat: number; lng: number; radius: number; severity: string }>;
-  alerts: AlertItem[];
+  alerts: any[];
 }
 
 export interface DisasterState {

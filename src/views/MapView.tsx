@@ -119,14 +119,16 @@ export const MapView: React.FC = () => {
 
   // 1. Initialize Tactical GIS Engine with Leaflet ONCE on mount
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (leafletMapRef.current) return;
+    if (!containerRef.current || leafletMapRef.current) return;
+
+    let timer: any = null;
+    let map: L.Map | null = null;
 
     try {
       const center = activeCity?.center || DEFAULT_CENTER;
       const zoom = activeCity?.zoom || 12;
 
-      const map = L.map(containerRef.current, {
+      map = L.map(containerRef.current, {
         center: [center.lat, center.lng],
         zoom: zoom,
         zoomControl: true,
@@ -142,20 +144,20 @@ export const MapView: React.FC = () => {
       setMapError('');
 
       // Invalidate size once layout stabilizes
-      const timer = setTimeout(() => {
-        map.invalidateSize();
+      timer = setTimeout(() => {
+        map?.invalidateSize();
       }, 200);
-
-      return () => {
-        clearTimeout(timer);
-        map.remove();
-        leafletMapRef.current = null;
-        overlaysGroupRef.current = null;
-      };
     } catch (err: any) {
       console.error('[Tactical Map] Error initializing Leaflet:', err);
       setMapError(err.message || 'Failed to initialize Tactical GIS engine.');
     }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      if (map) map.remove();
+      leafletMapRef.current = null;
+      overlaysGroupRef.current = null;
+    };
   }, []);
 
   // 2. Manage Basemap Tiles (Swaps layers cleanly WITHOUT destroying the map)
@@ -299,7 +301,7 @@ export const MapView: React.FC = () => {
             <div style="font-weight:700;font-size:13px;margin-bottom:3px;">🏠 ${s.name}</div>
             <div style="color:#64748b;margin-bottom:3px;">${s.zoneName}</div>
             <div style="margin-bottom:3px;"><span style="color:#64748b;">Occupancy:</span> <b>${s.currentOccupancy} / ${s.capacity}</b></div>
-            <div style="margin-bottom:3px;"><span style="color:#64748b;">Generator:</span> <b>${s.generatorBackup ? 'Available' : 'None'}</b></div>
+            <div style="margin-bottom:3px;"><span style="color:#64748b;">Generator:</span> <b>{s.amenities?.backupPower ? 'Available' : 'None'}</b></div>
             ${s.contactPhone ? `<div><span style="color:#64748b;">Phone:</span> <a href="tel:${s.contactPhone}" style="color:#2E9CCA;text-decoration:none;font-weight:600;">${s.contactPhone}</a></div>` : ''}
           </div>
         `);

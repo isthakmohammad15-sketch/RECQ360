@@ -14,6 +14,7 @@ import {
   DisasterState,
 } from '../types';
 import { supabase } from '../integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   mapZone,
   mapAsset,
@@ -1362,14 +1363,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unread = notifications.filter((n) => !n.read);
     if (unread.length === 0) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    void supabase
-      .from('notification_reads')
-      .upsert(
-        unread.map((n) => ({ notification_id: n.id, user_id: currentUser.id })),
-        { onConflict: 'notification_id,user_id', ignoreDuplicates: true },
-      )
-      .then(() => loadPrivate())
-      .catch(() => {});
+    void (async () => {
+      try {
+        await supabase
+          .from('notification_reads')
+          .upsert(
+            unread.map((n) => ({ notification_id: n.id, user_id: currentUser.id })),
+            { onConflict: 'notification_id,user_id', ignoreDuplicates: true },
+          );
+        await loadPrivate();
+      } catch {}
+    })();
   };
 
   const pushNotification: AppContextType['pushNotification'] = async (n) => {
