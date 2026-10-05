@@ -108,30 +108,33 @@ export const TopBar: React.FC = () => {
           </select>
         </div>
 
-        {/* Dynamic Threat / Advisory Badge */}
+        {/* Dynamic Threat / Advisory Badge + Timing beside it */}
         {activeCity && (
-          <div
-            className={`hidden xl:flex items-center gap-2 px-2.5 py-1 rounded border text-xs font-mono ${
-              activeCity.advisorySeverity === 'critical'
-                ? 'border-[#E4572E]/40 bg-[#E4572E]/10 text-[#E4572E] glow-red'
-                : activeCity.advisorySeverity === 'warning'
-                ? 'border-[#F2B138]/40 bg-[#F2B138]/10 text-[#F2B138]'
-                : 'border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA]'
-            }`}
-          >
-            <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
-            <span>{activeCity.currentAdvisory}</span>
+          <div className="hidden lg:flex items-center gap-2">
+            <div
+              className={`flex items-center gap-2 px-2.5 py-1 rounded border text-xs font-mono ${
+                activeCity.advisorySeverity === 'critical'
+                  ? 'border-[#E4572E]/40 bg-[#E4572E]/10 text-[#E4572E] glow-red'
+                  : activeCity.advisorySeverity === 'warning'
+                  ? 'border-[#F2B138]/40 bg-[#F2B138]/10 text-[#F2B138]'
+                  : 'border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA]'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
+              <span>{activeCity.currentAdvisory}</span>
+            </div>
+
+            {/* Live Timing directly beside the Advisory */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0B1220] border border-white/10 text-slate-300 font-mono text-xs shadow-inner">
+              <Clock className="w-3.5 h-3.5 text-[#2E9CCA]" />
+              <span>{timeString}</span>
+            </div>
           </div>
         )}
       </div>
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        {/* Ticking Live Clock */}
-        <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded bg-[#0B1220] border border-white/10 text-slate-300 font-mono text-xs">
-          <Clock className="w-3.5 h-3.5 text-[#2E9CCA]" />
-          <span>{timeString || '2026-07-30 17:58:12 IST'}</span>
-        </div>
 
         {/* Live Grid Status */}
         <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded bg-[#2FBF71]/10 border border-[#2FBF71]/30 text-[#2FBF71] font-mono text-xs">
