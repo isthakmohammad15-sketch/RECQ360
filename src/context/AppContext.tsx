@@ -43,6 +43,12 @@ import {
   DEFAULT_STATE_ID,
   DEFAULT_CITY_ID,
   findCityById,
+  findStateByCityId,
+  findCountryByCityId,
+  getAllCountries,
+  getStatesForCountry,
+  getAllCities,
+  getFilteredCities,
 } from '../data/regionsData';
 
 const STORAGE_PREFIX = 'cyclone360.local_';
@@ -275,14 +281,19 @@ interface AppContextType {
   createShelter: (v: Record<string, any>) => Promise<void>;
   createAlert: (v: Record<string, any>) => Promise<void>;
   createContact: (v: Record<string, any>) => Promise<void>;
+  selectedCountryId: string;
   selectedStateId: string;
   selectedCityId: string;
   activeCity: DisasterCity;
   activeState: DisasterState;
+  activeCountry: string;
+  setSelectedCountry: (country: string) => void;
   setSelectedState: (stateId: string) => void;
   setSelectedCity: (cityId: string) => void;
+  availableCountries: string[];
   availableStates: DisasterState[];
   availableCitiesForState: DisasterCity[];
+  allCities: DisasterCity[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -314,58 +325,130 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [loading, setLoading] = useState<boolean>(true);
 
+  const [selectedCountryId, setSelectedCountryId] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('recq360_country_id')) || 'all';
+  });
   const [selectedStateId, setSelectedStateId] = useState<string>(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('recq360_state_id')) || DEFAULT_STATE_ID;
+    return (typeof window !== 'undefined' && localStorage.getItem('recq360_state_id')) || 'all';
   });
   const [selectedCityId, setSelectedCityId] = useState<string>(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('recq360_city_id')) || DEFAULT_CITY_ID;
   });
 
-  const availableStates = GLOBAL_DISASTER_REGIONS;
+  const allCities = useMemo(() => {
+    return getAllCities();
+  }, []);
 
-  const activeState = useMemo(() => {
-    return GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId) || GLOBAL_DISASTER_REGIONS[0];
-  }, [selectedStateId]);
+  const availableCountries = useMemo(() => {
+    return ['all', ...getAllCountries()];
+  }, []);
+
+  const availableStates = useMemo(() => {
+    if (selectedCountryId && selectedCountryId !== 'all') {
+      return getStatesForCountry(selectedCountryId);
+    }
+    return GLOBAL_DISASTER_REGIONS;
+  }, [selectedCountryId]);
 
   const availableCitiesForState = useMemo(() => {
-    return activeState?.cities || [];
-  }, [activeState]);
+    return getFilteredCities(selectedCountryId, selectedStateId);
+  }, [selectedCountryId, selectedStateId]);
 
+  // activeCity is resolved globally from selectedCityId — never locked by overview state!
   const activeCity = useMemo(() => {
     return (
-      availableCitiesForState.find((c) => c.id === selectedCityId) ||
-      availableCitiesForState[0] ||
-      findCityById('visakhapatnam')!
+      findCityById(selectedCityId) ||
+      findCityById(DEFAULT_CITY_ID) ||
+      GLOBAL_DISASTER_REGIONS[0].cities[0]
     );
-  }, [availableCitiesForState, selectedCityId]);
+  }, [selectedCityId]);
+
+  const activeState = useMemo(() => {
+    const parent = findStateByCityId(activeCity.id);
+    if (parent) return parent;
+    if (selectedStateId && selectedStateId !== 'all') {
+      return GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId) || GLOBAL_DISASTER_REGIONS[0];
+    }
+    return GLOBAL_DISASTER_REGIONS[0];
+  }, [activeCity, selectedStateId]);
+
+  const activeCountry = useMemo(() => {
+    return activeCity?.country || activeState?.country || 'India';
+  }, [activeCity, activeState]);
+
+  const setSelectedCountry = useCallback((country: string) => {
+    setSelectedCountryId(country);
+    if (typeof window !== 'undefined') localStorage.setItem('recq360_country_id', country);
+
+    if (country === 'all') {
+      setSelectedStateId('all');
+      if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', 'all');
+      toast.success('Viewing All Countries', { description: 'Global multi-jurisdiction disaster coverage active' });
+    } else {
+      const states = getStatesForCountry(country);
+      if (states.length > 0) {
+        if (activeCity.country.toLowerCase() !== country.toLowerCase()) {
+          const firstState = states[0];
+          const firstCity = firstState.cities[0];
+          setSelectedStateId(firstState.id);
+          setSelectedCityId(firstCity.id);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('recq360_state_id', firstState.id);
+            localStorage.setItem('recq360_city_id', firstCity.id);
+          }
+          toast.success(`Country Selected: ${country}`, { description: `Active Grid: ${firstCity.name}, ${firstState.name}` });
+        } else {
+          toast.success(`Country Selected: ${country}`);
+        }
+      }
+    }
+  }, [activeCity]);
 
   const setSelectedState = useCallback((stateId: string) => {
+    if (stateId === 'all') {
+      setSelectedStateId('all');
+      if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', 'all');
+      toast.success('Viewing All States', { description: 'All regional commands available' });
+      return;
+    }
     const state = GLOBAL_DISASTER_REGIONS.find((s) => s.id === stateId);
     if (!state) return;
     setSelectedStateId(stateId);
-    if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', stateId);
-    if (state.cities.length > 0) {
-      const firstCity = state.cities[0];
-      setSelectedCityId(firstCity.id);
-      if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', firstCity.id);
-      toast.success(`Selected State: ${state.name}`, { description: `Active Grid: ${firstCity.name}` });
+    setSelectedCountryId(state.country);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('recq360_state_id', stateId);
+      localStorage.setItem('recq360_country_id', state.country);
     }
-  }, []);
+    if (!state.cities.some((c) => c.id === selectedCityId)) {
+      if (state.cities.length > 0) {
+        const firstCity = state.cities[0];
+        setSelectedCityId(firstCity.id);
+        if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', firstCity.id);
+        toast.success(`Selected State: ${state.name} (${state.country})`, { description: `Active Grid: ${firstCity.name}` });
+      }
+    } else {
+      toast.success(`Selected State: ${state.name} (${state.country})`);
+    }
+  }, [selectedCityId]);
 
   const setSelectedCity = useCallback((cityId: string) => {
     const city = findCityById(cityId);
     if (!city) return;
-    const parentState = GLOBAL_DISASTER_REGIONS.find((s) => s.cities.some((c) => c.id === cityId));
-    if (parentState && parentState.id !== selectedStateId) {
+    const parentState = findStateByCityId(cityId);
+    if (parentState) {
       setSelectedStateId(parentState.id);
-      if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', parentState.id);
+      setSelectedCountryId(parentState.country);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('recq360_state_id', parentState.id);
+        localStorage.setItem('recq360_country_id', parentState.country);
+      }
     }
     setSelectedCityId(cityId);
     if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', cityId);
     toast.success(`Operational Grid Changed: ${city.name}`, {
-      description: `${city.state} • Primary Hazard: ${city.primaryHazard}`,
+      description: `${city.state}, ${city.country} • Primary Hazard: ${city.primaryHazard}`,
     });
-  }, [selectedStateId]);
+  }, []);
 
   const [users, setUsers] = useState<User[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -1561,14 +1644,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createShelter,
         createAlert,
         createContact,
+        selectedCountryId,
         selectedStateId,
         selectedCityId,
         activeCity,
         activeState,
+        activeCountry,
+        setSelectedCountry,
         setSelectedState,
         setSelectedCity,
+        availableCountries,
         availableStates,
         availableCitiesForState,
+        allCities,
       }}
     >
       {children}

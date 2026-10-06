@@ -10,6 +10,7 @@ import {
   Bell,
   Sparkles,
   MapPin,
+  Globe,
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -24,14 +25,19 @@ export const TopBar: React.FC = () => {
     notifications,
     unreadCount,
     markAllNotificationsRead,
+    selectedCountryId,
     selectedStateId,
     selectedCityId,
     activeCity,
     activeState,
+    activeCountry,
+    setSelectedCountry,
     setSelectedState,
     setSelectedCity,
+    availableCountries,
     availableStates,
     availableCitiesForState,
+    allCities,
   } = useApp();
   const [timeString, setTimeString] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -72,38 +78,106 @@ export const TopBar: React.FC = () => {
           </div>
         </div>
 
-        {/* Global Cascading Location Selector: State -> City */}
-        <div className="flex items-center gap-1.5 bg-[#0B1220] border border-[#2E9CCA]/40 rounded-lg px-2 py-1 text-xs font-mono shadow-inner">
-          <MapPin className="w-3.5 h-3.5 text-[#2E9CCA] shrink-0" />
-
-          {/* State Dropdown */}
-          <select
-            value={selectedStateId}
-            onChange={(e) => setSelectedState(e.target.value)}
-            className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
-            title="Choose State / Region"
-          >
-            {availableStates.map((st) => (
-              <option key={st.id} value={st.id} className="bg-[#0F1A2E] text-white">
-                {st.name}
+        {/* Global Cascading Location Selector: Country -> State -> City */}
+        <div className="flex items-center gap-1.5 bg-[#0B1220] border border-[#2E9CCA]/40 rounded-lg px-2 py-1 text-xs font-mono shadow-inner max-w-full overflow-x-auto">
+          {/* Country Selector */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Globe className="w-3.5 h-3.5 text-[#2E9CCA] shrink-0" />
+            <select
+              value={selectedCountryId}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+              title="Choose Country (All Countries gives global access)"
+            >
+              <option value="all" className="bg-[#0F1A2E] text-[#2E9CCA] font-bold">
+                🌐 All Countries
               </option>
-            ))}
-          </select>
+              {availableCountries
+                .filter((c) => c !== 'all')
+                .map((country) => (
+                  <option key={country} value={country} className="bg-[#0F1A2E] text-white">
+                    {country}
+                  </option>
+                ))}
+            </select>
+          </div>
 
           <span className="text-slate-500 font-mono">/</span>
 
-          {/* City Dropdown: ONLY contains cities belonging to selectedState */}
+          {/* State Selector */}
+          <div className="flex items-center gap-1 shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-[#F2B138] shrink-0" />
+            <select
+              value={selectedStateId}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+              title="Choose State / Region"
+            >
+              <option value="all" className="bg-[#0F1A2E] text-[#F2B138] font-bold">
+                🗺️ All States
+              </option>
+              {availableStates.map((st) => (
+                <option key={st.id} value={st.id} className="bg-[#0F1A2E] text-white">
+                  {st.name} {selectedCountryId === 'all' ? `(${st.country})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <span className="text-slate-500 font-mono">/</span>
+
+          {/* City Selector: Can select ANY city without being locked by Overview */}
           <select
             value={selectedCityId}
             onChange={(e) => setSelectedCity(e.target.value)}
-            className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/30 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer"
-            title={`Choose City in ${activeState?.name || 'this state'}`}
+            className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/30 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer max-w-[170px] truncate"
+            title={`Active City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
           >
-            {availableCitiesForState.map((ct) => (
-              <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
-                {ct.name}
-              </option>
-            ))}
+            {selectedStateId !== 'all' ? (
+              <>
+                <optgroup label={`${activeState?.name} Cities`}>
+                  {availableCitiesForState.map((ct) => (
+                    <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                      {ct.name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🌐 All Other Global Cities">
+                  {allCities
+                    .filter((ct) => !availableCitiesForState.some((c) => c.id === ct.id))
+                    .map((ct) => (
+                      <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-slate-300">
+                        {ct.name} ({ct.state}, {ct.country})
+                      </option>
+                    ))}
+                </optgroup>
+              </>
+            ) : selectedCountryId !== 'all' ? (
+              <>
+                <optgroup label={`${selectedCountryId} Cities`}>
+                  {availableCitiesForState.map((ct) => (
+                    <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                      {ct.name} ({ct.state})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🌐 All Other Global Cities">
+                  {allCities
+                    .filter((ct) => !availableCitiesForState.some((c) => c.id === ct.id))
+                    .map((ct) => (
+                      <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-slate-300">
+                        {ct.name} ({ct.state}, {ct.country})
+                      </option>
+                    ))}
+                </optgroup>
+              </>
+            ) : (
+              allCities.map((ct) => (
+                <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                  {ct.name} — {ct.state} ({ct.country})
+                </option>
+              ))
+            )}
           </select>
         </div>
 

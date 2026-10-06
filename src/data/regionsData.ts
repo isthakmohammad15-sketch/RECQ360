@@ -15,7 +15,7 @@ const VIZAG_HOTSPOTS = [
   { id: 'hs-4', name: 'Gajuwaka Industrial Culvert Stream', lat: 17.6892, lng: 83.2182, radius: 500, severity: 'High' },
 ];
 
-export const GLOBAL_DISASTER_REGIONS: DisasterState[] = [
+const RAW_DISASTER_REGIONS: DisasterState[] = [
   {
     id: 'andhra-pradesh',
     name: 'Andhra Pradesh',
@@ -1292,7 +1292,661 @@ export const GLOBAL_DISASTER_REGIONS: DisasterState[] = [
   },
 ];
 
-// Helper to look up a city by id
+const ADDITIONAL_GLOBAL_REGIONS: DisasterState[] = [
+  {
+    id: 'karnataka',
+    name: 'Karnataka',
+    country: 'India',
+    cities: [
+      {
+        id: 'bengaluru',
+        name: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        center: { lat: 12.9716, lng: 77.5946 },
+        zoom: 12,
+        primaryHazard: 'Urban Storm Inundation & Bellandur Lake Spillway Overflow',
+        currentAdvisory: 'URBAN FLOOD ALERT: HIGH RAINFALL RUNOFF MONITORING',
+        advisorySeverity: 'warning',
+        readinessScore: 84,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+      {
+        id: 'mangaluru',
+        name: 'Mangaluru',
+        state: 'Karnataka',
+        country: 'India',
+        center: { lat: 12.9141, lng: 74.856 },
+        zoom: 12,
+        primaryHazard: 'Arabian Sea Coastal Surge & Netravati River Flood Warning',
+        currentAdvisory: 'COASTAL STORM WARNING: HIGH SURGE ALERT ON HARBOR',
+        advisorySeverity: 'critical',
+        readinessScore: 81,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'delhi',
+    name: 'Delhi NCR',
+    country: 'India',
+    cities: [
+      {
+        id: 'new-delhi',
+        name: 'New Delhi',
+        state: 'Delhi NCR',
+        country: 'India',
+        center: { lat: 28.6139, lng: 77.209 },
+        zoom: 12,
+        primaryHazard: 'Yamuna River Overflow & Low-Lying Floodplain Inundation',
+        currentAdvisory: 'YAMUNA SPATE WATCH: WATER LEVEL CROSSES DANGER MARK (205.53m)',
+        advisorySeverity: 'critical',
+        readinessScore: 86,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'california-usa',
+    name: 'California',
+    country: 'United States',
+    cities: [
+      {
+        id: 'los-angeles',
+        name: 'Los Angeles',
+        state: 'California',
+        country: 'United States',
+        center: { lat: 34.0522, lng: -118.2437 },
+        zoom: 12,
+        primaryHazard: 'Atmospheric River Storm & Pacific Coastal Debris Flows',
+        currentAdvisory: 'ATMOSPHERIC RIVER ALERT: FLASH FLOOD WATCH & HILLSIDE EVACUATION',
+        advisorySeverity: 'critical',
+        readinessScore: 92,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+      {
+        id: 'san-francisco',
+        name: 'San Francisco',
+        state: 'California',
+        country: 'United States',
+        center: { lat: 37.7749, lng: -122.4194 },
+        zoom: 12,
+        primaryHazard: 'San Francisco Bay King Tide Storm Surge & Seismic Flood Gate Alert',
+        currentAdvisory: 'BAY SURGE ADVISORY: EMBARCADERO PUMP STATIONS ENGAGED',
+        advisorySeverity: 'warning',
+        readinessScore: 94,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'texas-usa',
+    name: 'Texas',
+    country: 'United States',
+    cities: [
+      {
+        id: 'houston',
+        name: 'Houston',
+        state: 'Texas',
+        country: 'United States',
+        center: { lat: 29.7604, lng: -95.3698 },
+        zoom: 12,
+        primaryHazard: 'Gulf Coast Severe Hurricane & Buffalo Bayou Surge Overflow',
+        currentAdvisory: 'HURRICANE WATCH: BUFFALO BAYOU FLOOD GATES MONITORED',
+        advisorySeverity: 'critical',
+        readinessScore: 89,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+      {
+        id: 'galveston',
+        name: 'Galveston',
+        state: 'Texas',
+        country: 'United States',
+        center: { lat: 29.3013, lng: -94.7977 },
+        zoom: 12,
+        primaryHazard: 'Gulf of Mexico Category 4 Storm Surge & Seawall Inundation',
+        currentAdvisory: 'COASTAL STORM WARNING: BARRIER ISLAND HIGH SURGE ALERT',
+        advisorySeverity: 'critical',
+        readinessScore: 86,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'new-york-usa',
+    name: 'New York',
+    country: 'United States',
+    cities: [
+      {
+        id: 'new-york-city',
+        name: 'New York City',
+        state: 'New York',
+        country: 'United States',
+        center: { lat: 40.7128, lng: -74.006 },
+        zoom: 12,
+        primaryHazard: 'Atlantic Nor’easter Surge & Lower Manhattan Subway Inundation',
+        currentAdvisory: 'STORM SURGE WARNING: LOWER MANHATTAN FLOOD GATES CLOSED',
+        advisorySeverity: 'critical',
+        readinessScore: 93,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'louisiana-usa',
+    name: 'Louisiana',
+    country: 'United States',
+    cities: [
+      {
+        id: 'new-orleans',
+        name: 'New Orleans',
+        state: 'Louisiana',
+        country: 'United States',
+        center: { lat: 29.9511, lng: -90.0715 },
+        zoom: 12,
+        primaryHazard: 'Mississippi River Surge & Lake Pontchartrain Levee Breach Risk',
+        currentAdvisory: 'PUMP STATION WATCH: 24/7 LEVEE OVERFLOW PATROL ACTIVATED',
+        advisorySeverity: 'critical',
+        readinessScore: 88,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'osaka-japan',
+    name: 'Osaka',
+    country: 'Japan',
+    cities: [
+      {
+        id: 'osaka',
+        name: 'Osaka',
+        state: 'Osaka',
+        country: 'Japan',
+        center: { lat: 34.6937, lng: 135.5023 },
+        zoom: 12,
+        primaryHazard: 'Osaka Bay Super Typhoon Surge & Yodo River Flood Defenses',
+        currentAdvisory: 'TYPHOON WARNING: UNDERGROUND SUMP GATES DEPLOYED',
+        advisorySeverity: 'warning',
+        readinessScore: 96,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'central-visayas-ph',
+    name: 'Central Visayas',
+    country: 'Philippines',
+    cities: [
+      {
+        id: 'cebu-city',
+        name: 'Cebu City',
+        state: 'Central Visayas',
+        country: 'Philippines',
+        center: { lat: 10.3157, lng: 123.8854 },
+        zoom: 12,
+        primaryHazard: 'Visayan Sea Typhoon Surge & Coastal Inundation Corridor',
+        currentAdvisory: 'TYPHOON SIGNAL NO. 2: MARITIME TRAFFIC SUSPENDED',
+        advisorySeverity: 'critical',
+        readinessScore: 82,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'greater-london-uk',
+    name: 'Greater London',
+    country: 'United Kingdom',
+    cities: [
+      {
+        id: 'london',
+        name: 'London',
+        state: 'Greater London',
+        country: 'United Kingdom',
+        center: { lat: 51.5074, lng: -0.1278 },
+        zoom: 12,
+        primaryHazard: 'North Sea Tidal Surge & River Thames Estuary Spill',
+        currentAdvisory: 'THAMES BARRIER CLOSED: FLOOD RISK LEVEL 3 DEFENSE ENGAGED',
+        advisorySeverity: 'warning',
+        readinessScore: 95,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'queensland-au',
+    name: 'Queensland',
+    country: 'Australia',
+    cities: [
+      {
+        id: 'brisbane',
+        name: 'Brisbane',
+        state: 'Queensland',
+        country: 'Australia',
+        center: { lat: -27.4698, lng: 153.0251 },
+        zoom: 12,
+        primaryHazard: 'Brisbane River Extreme Flash Flooding & Coral Sea Tropical Low',
+        currentAdvisory: 'MAJOR FLOOD WARNING: WIVENHOE DAM REGULATED SPURT',
+        advisorySeverity: 'critical',
+        readinessScore: 90,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+      {
+        id: 'cairns',
+        name: 'Cairns',
+        state: 'Queensland',
+        country: 'Australia',
+        center: { lat: -16.9186, lng: 145.7781 },
+        zoom: 12,
+        primaryHazard: 'Coral Sea Category 4 Tropical Cyclone Coastal Strike',
+        currentAdvisory: 'CYCLONE EMERGENCY: TRINITY INLET EVACUATION IN FORCE',
+        advisorySeverity: 'critical',
+        readinessScore: 88,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'nsw-au',
+    name: 'New South Wales',
+    country: 'Australia',
+    cities: [
+      {
+        id: 'sydney',
+        name: 'Sydney',
+        state: 'New South Wales',
+        country: 'Australia',
+        center: { lat: -33.8688, lng: 151.2093 },
+        zoom: 12,
+        primaryHazard: 'East Coast Low Severe Maritime Gale & Hawkesbury River Flooding',
+        currentAdvisory: 'EAST COAST LOW: SEVERE WEATHER & FLASH FLOOD WATCH',
+        advisorySeverity: 'warning',
+        readinessScore: 92,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'bc-canada',
+    name: 'British Columbia',
+    country: 'Canada',
+    cities: [
+      {
+        id: 'vancouver',
+        name: 'Vancouver',
+        state: 'British Columbia',
+        country: 'Canada',
+        center: { lat: 49.2827, lng: -123.1207 },
+        zoom: 12,
+        primaryHazard: 'Fraser River Spring Freshet Flood & Pacific Atmospheric River',
+        currentAdvisory: 'ATMOSPHERIC RIVER ALERT: SEA DIKE REINFORCEMENTS ACTIVE',
+        advisorySeverity: 'warning',
+        readinessScore: 93,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'chittagong-bd',
+    name: 'Chittagong Division',
+    country: 'Bangladesh',
+    cities: [
+      {
+        id: 'chittagong',
+        name: 'Chittagong',
+        state: 'Chittagong Division',
+        country: 'Bangladesh',
+        center: { lat: 22.3569, lng: 91.7832 },
+        zoom: 12,
+        primaryHazard: 'Bay of Bengal Super Cyclone Landfall & Karnaphuli Tidal Surge',
+        currentAdvisory: 'GREAT DANGER SIGNAL 10: MASS EVACUATION TO CYCLONE SHELTERS',
+        advisorySeverity: 'critical',
+        readinessScore: 78,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+      {
+        id: 'coxs-bazar',
+        name: "Cox's Bazar",
+        state: 'Chittagong Division',
+        country: 'Bangladesh',
+        center: { lat: 21.4272, lng: 92.0058 },
+        zoom: 12,
+        primaryHazard: 'Severe Coastal Sea Inundation & Vulnerable Coastal Encampments',
+        currentAdvisory: 'CYCLONE WARNING: RED CRESCENT SEARCH & RESCUE MOBILIZED',
+        advisorySeverity: 'critical',
+        readinessScore: 75,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+  {
+    id: 'dhaka-bd',
+    name: 'Dhaka Division',
+    country: 'Bangladesh',
+    cities: [
+      {
+        id: 'dhaka',
+        name: 'Dhaka',
+        state: 'Dhaka Division',
+        country: 'Bangladesh',
+        center: { lat: 23.8103, lng: 90.4125 },
+        zoom: 12,
+        primaryHazard: 'Buriganga River Inundation & Metropolitan Drainage Congestion',
+        currentAdvisory: 'MONSOON FLOOD ALERT: HIGH-CAPACITY PUMPS AT MAXIMUM DEPLOYMENT',
+        advisorySeverity: 'warning',
+        readinessScore: 76,
+        zones: [],
+        shelters: [],
+        assets: [],
+        hotspots: [],
+        alerts: [],
+      },
+    ],
+  },
+];
+
+// Enricher that ensures every city has rich tactical zones, shelters, assets, hotspots & alerts
+function enrichCity(city: DisasterCity): DisasterCity {
+  const cLat = city.center.lat;
+  const cLng = city.center.lng;
+
+  const zones: Zone[] =
+    city.zones && city.zones.length > 0
+      ? city.zones
+      : [
+          {
+            id: `${city.id}-z1`,
+            number: 1,
+            name: `${city.name} Central & Coastal/Riverfront Sump Zone`,
+            readinessScore: Math.min(100, Math.max(50, city.readinessScore + 4)),
+            status: 'ready' as const,
+            pendingTaskCount: 1,
+            officerName: 'Senior Zonal Operations Marshal',
+            officerContact: '+1 800-RECQ-01',
+            officerRole: 'Zonal Incident Marshal',
+            coordinates: [Number((cLat + 0.012).toFixed(4)), Number((cLng - 0.012).toFixed(4))],
+            populationAtRisk: 48000,
+            shelterCount: 4,
+            assetCount: 6,
+            deptBreakdown: {},
+          },
+          {
+            id: `${city.id}-z2`,
+            number: 2,
+            name: `${city.name} Low-Lying Storm Drainage Basin`,
+            readinessScore: Math.min(100, Math.max(40, city.readinessScore - 8)),
+            status: 'pending' as const,
+            pendingTaskCount: 4,
+            officerName: 'Field Drainage Supervisor',
+            officerContact: '+1 800-RECQ-02',
+            officerRole: 'Urban Sump Officer',
+            coordinates: [Number((cLat - 0.014).toFixed(4)), Number((cLng + 0.015).toFixed(4))],
+            populationAtRisk: 62000,
+            shelterCount: 3,
+            assetCount: 5,
+            deptBreakdown: {},
+          },
+          {
+            id: `${city.id}-z3`,
+            number: 3,
+            name: `${city.name} Industrial & Harbor Inundation Corridor`,
+            readinessScore: Math.min(100, Math.max(35, city.readinessScore - 14)),
+            status: 'critical' as const,
+            pendingTaskCount: 6,
+            officerName: 'Emergency Logistics Lead',
+            officerContact: '+1 800-RECQ-03',
+            officerRole: 'Disaster Marshal (Circle 3)',
+            coordinates: [Number((cLat + 0.018).toFixed(4)), Number((cLng + 0.022).toFixed(4))],
+            populationAtRisk: 38000,
+            shelterCount: 2,
+            assetCount: 4,
+            deptBreakdown: {},
+          },
+        ];
+
+  const shelters: Shelter[] =
+    city.shelters && city.shelters.length > 0
+      ? city.shelters
+      : [
+          {
+            id: `${city.id}-s1`,
+            name: `${city.name} Municipal Disaster Relief Center & Stadium`,
+            zoneId: `${city.id}-z1`,
+            zoneName: `${city.name} Central Zone`,
+            capacity: 3500,
+            currentOccupancy: 420,
+            status: 'operational',
+            coordinates: [Number((cLat + 0.008).toFixed(4)), Number((cLng - 0.006).toFixed(4))],
+            foodWaterStatus: 'Adequate',
+            medicalSupport: true,
+            generatorBackup: true,
+            contactPerson: 'Relief Center Administrator',
+            contactPhone: '+1 800-SHELTER-1',
+          },
+          {
+            id: `${city.id}-s2`,
+            name: `${city.name} Community High School Relief Shelter`,
+            zoneId: `${city.id}-z2`,
+            zoneName: `${city.name} Drainage Basin`,
+            capacity: 2200,
+            currentOccupancy: 310,
+            status: 'operational',
+            coordinates: [Number((cLat - 0.01).toFixed(4)), Number((cLng + 0.011).toFixed(4))],
+            foodWaterStatus: 'Adequate',
+            medicalSupport: true,
+            generatorBackup: true,
+            contactPerson: 'Relief Logistics Coordinator',
+            contactPhone: '+1 800-SHELTER-2',
+          },
+        ];
+
+  const assets: Asset[] =
+    city.assets && city.assets.length > 0
+      ? city.assets
+      : [
+          {
+            id: `${city.id}-a1`,
+            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-PUMP-01`,
+            name: 'High-Volume Heavy Dewatering Pump (120 HP)',
+            type: 'de-watering-pump',
+            status: 'operational',
+            zoneId: `${city.id}-z1`,
+            zoneName: `${city.name} Central Zone`,
+            location: `${city.name} Low-Lying Drainage Outfall`,
+            department: 'Drainage & Irrigation',
+            assignedTo: 'Er. P. Ramanathan',
+            contactPhone: '+1 800-ASSET-01',
+            coordinates: [Number((cLat + 0.006).toFixed(4)), Number((cLng - 0.008).toFixed(4))],
+            fuelLevel: 88,
+            lastInspectionDate: 'Yesterday',
+            workingCondition: 'Good',
+          },
+          {
+            id: `${city.id}-a2`,
+            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-GEN-01`,
+            name: 'Mobile Backup Diesel Generator (250 kVA)',
+            type: 'generator',
+            status: 'operational',
+            zoneId: `${city.id}-z1`,
+            zoneName: `${city.name} Central Zone`,
+            location: `${city.name} Command & Relief HQ`,
+            department: 'Electrical Engineering',
+            assignedTo: 'Tech. S. Narayanan',
+            contactPhone: '+1 800-ASSET-02',
+            coordinates: [Number((cLat + 0.01).toFixed(4)), Number((cLng + 0.005).toFixed(4))],
+            fuelLevel: 94,
+            lastInspectionDate: 'Today',
+            workingCondition: 'Excellent',
+          },
+          {
+            id: `${city.id}-a3`,
+            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-BOAT-01`,
+            name: 'Rapid Deployment Flood Rescue Zodiac Boat',
+            type: 'rescue-boat',
+            status: 'operational',
+            zoneId: `${city.id}-z2`,
+            zoneName: `${city.name} Drainage Basin`,
+            location: `${city.name} Waterways Boat Launch`,
+            department: 'Disaster Response Force',
+            assignedTo: 'Officer M. Kulkarni',
+            contactPhone: '+1 800-ASSET-03',
+            coordinates: [Number((cLat - 0.008).toFixed(4)), Number((cLng - 0.012).toFixed(4))],
+            fuelLevel: 100,
+            lastInspectionDate: 'Today',
+            workingCondition: 'Good',
+          },
+          {
+            id: `${city.id}-a4`,
+            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-AMB-01`,
+            name: 'Advanced Life Support Emergency Ambulance ALS-01',
+            type: 'ambulance',
+            status: 'operational',
+            zoneId: `${city.id}-z3`,
+            zoneName: `${city.name} Harbor Corridor`,
+            location: `${city.name} General Hospital Trauma Care`,
+            department: 'Public Health',
+            assignedTo: 'Dr. Anita Roy',
+            contactPhone: '+1 800-ASSET-04',
+            coordinates: [Number((cLat + 0.004).toFixed(4)), Number((cLng + 0.014).toFixed(4))],
+            fuelLevel: 92,
+            lastInspectionDate: 'Today',
+            workingCondition: 'Good',
+          },
+        ];
+
+  const hotspots =
+    city.hotspots && city.hotspots.length > 0
+      ? city.hotspots
+      : [
+          {
+            id: `${city.id}-hs-1`,
+            name: `${city.name} Low-Lying Tidal Drainage Basin`,
+            lat: Number((cLat + 0.005).toFixed(4)),
+            lng: Number((cLng - 0.007).toFixed(4)),
+            radius: 650,
+            severity: 'Critical',
+          },
+          {
+            id: `${city.id}-hs-2`,
+            name: `${city.name} Coastal / River Inundation Corridor`,
+            lat: Number((cLat - 0.009).toFixed(4)),
+            lng: Number((cLng + 0.01).toFixed(4)),
+            radius: 750,
+            severity: 'High',
+          },
+        ];
+
+  const alerts =
+    city.alerts && city.alerts.length > 0
+      ? city.alerts
+      : [
+          {
+            id: `${city.id}-alt-1`,
+            type: 'weather',
+            severity: city.advisorySeverity || 'critical',
+            title: city.currentAdvisory,
+            message: `${city.primaryHazard} in effect across ${city.name}. Response units and rescue brigades on active standby.`,
+            timestamp: formatLiveTimestamp(10),
+            zoneId: `${city.id}-z1`,
+            resolved: false,
+          },
+        ];
+
+  return {
+    ...city,
+    zones,
+    shelters,
+    assets,
+    hotspots,
+    alerts,
+  };
+}
+
+function enrichDisasterRegions(states: DisasterState[]): DisasterState[] {
+  return states.map((state) => ({
+    ...state,
+    cities: state.cities.map(enrichCity),
+  }));
+}
+
+// Global Disaster Regions with rich data for every single jurisdiction
+export const GLOBAL_DISASTER_REGIONS: DisasterState[] = enrichDisasterRegions([
+  ...RAW_DISASTER_REGIONS,
+  ...ADDITIONAL_GLOBAL_REGIONS,
+]);
+
+// Helper to look up a city by id across all regions
 export function findCityById(cityId: string): DisasterCity | undefined {
   for (const s of GLOBAL_DISASTER_REGIONS) {
     const found = s.cities.find((c) => c.id === cityId);
@@ -1301,6 +1955,69 @@ export function findCityById(cityId: string): DisasterCity | undefined {
   return undefined;
 }
 
+// Helper to look up parent state by city id
+export function findStateByCityId(cityId: string): DisasterState | undefined {
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    if (s.cities.some((c) => c.id === cityId)) {
+      return s;
+    }
+  }
+  return undefined;
+}
+
+// Helper to look up country by city id
+export function findCountryByCityId(cityId: string): string | undefined {
+  const state = findStateByCityId(cityId);
+  return state?.country;
+}
+
+// Get all unique countries across all regions
+export function getAllCountries(): string[] {
+  const set = new Set<string>();
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    if (s.country) set.add(s.country);
+  }
+  return Array.from(set);
+}
+
+// Get states for a specific country ('all' or undefined returns all states)
+export function getStatesForCountry(country?: string): DisasterState[] {
+  if (!country || country === 'all') return GLOBAL_DISASTER_REGIONS;
+  return GLOBAL_DISASTER_REGIONS.filter(
+    (s) => s.country.toLowerCase() === country.toLowerCase()
+  );
+}
+
+// Get all cities globally (flattened)
+export function getAllCities(): DisasterCity[] {
+  const list: DisasterCity[] = [];
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    for (const c of s.cities) {
+      list.push(c);
+    }
+  }
+  return list;
+}
+
+// Get filtered cities by country and/or state
+export function getFilteredCities(country?: string, stateId?: string): DisasterCity[] {
+  let states = GLOBAL_DISASTER_REGIONS;
+  if (country && country !== 'all') {
+    states = states.filter((s) => s.country.toLowerCase() === country.toLowerCase());
+  }
+  if (stateId && stateId !== 'all') {
+    states = states.filter((s) => s.id === stateId);
+  }
+  const list: DisasterCity[] = [];
+  for (const s of states) {
+    for (const c of s.cities) {
+      list.push(c);
+    }
+  }
+  return list;
+}
+
 // Default initial state and city
 export const DEFAULT_STATE_ID = 'andhra-pradesh';
 export const DEFAULT_CITY_ID = 'visakhapatnam';
+

@@ -10,6 +10,8 @@ import {
   Building,
   Home,
   Boxes,
+  Globe,
+  Zap,
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -69,12 +71,17 @@ export const MapView: React.FC = () => {
     navigateTo,
     activeCity,
     activeState,
+    activeCountry,
+    selectedCountryId,
     selectedStateId,
     selectedCityId,
+    setSelectedCountry,
     setSelectedState,
     setSelectedCity,
+    availableCountries,
     availableStates,
     availableCitiesForState,
+    allCities,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -380,14 +387,13 @@ export const MapView: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6 space-y-4 h-[calc(100vh-80px)] flex flex-col">
-      {/* Tactical Map Header with Cascading State & City Selectors */}
+      {/* Tactical Map Header with Cascading Country, State & City Selectors */}
       <div className="bg-[#0F1A2E] border border-white/10 rounded-lg p-4 shadow-xl flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
             <MapPin className="w-5 h-5 text-[#2E9CCA]" />
             <span>
-              Interactive Tactical Map — {activeCity ? activeCity.name : 'Greater Visakhapatnam'} (
-              {activeState?.name || 'Global Grid'})
+              Interactive Tactical Map — {activeCity ? activeCity.name : 'Greater Visakhapatnam'} • {activeState?.name || 'Global Grid'} ({activeCountry || 'India'})
             </span>
           </h1>
           <p className="text-xs text-slate-400 font-mono flex flex-wrap items-center gap-2 mt-0.5">
@@ -406,38 +412,106 @@ export const MapView: React.FC = () => {
 
         {/* Tactical Controls Toolbar */}
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs w-full xl:w-auto">
-          {/* Cascading State & City Selector */}
+          {/* Cascading Country, State & City Selector */}
           <div className="flex items-center gap-1.5 bg-[#0B1220] border border-[#2E9CCA]/50 rounded-lg px-2.5 py-1.5 shadow-inner">
-            <MapPin className="w-3.5 h-3.5 text-[#2E9CCA] shrink-0" />
-
-            {/* State Dropdown */}
-            <select
-              value={selectedStateId}
-              onChange={(e) => setSelectedState(e.target.value)}
-              className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
-              title="Select State / Region"
-            >
-              {availableStates.map((st) => (
-                <option key={st.id} value={st.id} className="bg-[#0F1A2E] text-white">
-                  {st.name}
+            {/* Country Selector */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Globe className="w-3.5 h-3.5 text-[#2E9CCA] shrink-0" />
+              <select
+                value={selectedCountryId}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+                title="Select Country"
+              >
+                <option value="all" className="bg-[#0F1A2E] text-[#2E9CCA] font-bold">
+                  🌐 All Countries
                 </option>
-              ))}
-            </select>
+                {availableCountries
+                  .filter((c) => c !== 'all')
+                  .map((c) => (
+                    <option key={c} value={c} className="bg-[#0F1A2E] text-white">
+                      {c}
+                    </option>
+                  ))}
+              </select>
+            </div>
 
             <span className="text-slate-500 font-mono">/</span>
 
-            {/* City Dropdown: ONLY contains cities belonging to selected State */}
+            {/* State Selector */}
+            <div className="flex items-center gap-1 shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-[#F2B138] shrink-0" />
+              <select
+                value={selectedStateId}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+                title="Select State / Region"
+              >
+                <option value="all" className="bg-[#0F1A2E] text-[#F2B138] font-bold">
+                  🗺️ All States
+                </option>
+                {availableStates.map((st) => (
+                  <option key={st.id} value={st.id} className="bg-[#0F1A2E] text-white">
+                    {st.name} {selectedCountryId === 'all' ? `(${st.country})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <span className="text-slate-500 font-mono">/</span>
+
+            {/* City Selector: Can choose ANY city across any state or country */}
             <select
               value={selectedCityId}
               onChange={(e) => setSelectedCity(e.target.value)}
-              className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/40 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer"
-              title={`Select City in ${activeState?.name || 'this state'}`}
+              className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/40 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer max-w-[180px] truncate"
+              title={`Active Map City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
             >
-              {availableCitiesForState.map((ct) => (
-                <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
-                  {ct.name}
-                </option>
-              ))}
+              {selectedStateId !== 'all' ? (
+                <>
+                  <optgroup label={`${activeState?.name} Cities`}>
+                    {availableCitiesForState.map((ct) => (
+                      <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                        {ct.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🌐 All Other Global Cities">
+                    {allCities
+                      .filter((ct) => !availableCitiesForState.some((c) => c.id === ct.id))
+                      .map((ct) => (
+                        <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-slate-300">
+                          {ct.name} ({ct.state}, {ct.country})
+                        </option>
+                      ))}
+                  </optgroup>
+                </>
+              ) : selectedCountryId !== 'all' ? (
+                <>
+                  <optgroup label={`${selectedCountryId} Cities`}>
+                    {availableCitiesForState.map((ct) => (
+                      <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                        {ct.name} ({ct.state})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🌐 All Other Global Cities">
+                    {allCities
+                      .filter((ct) => !availableCitiesForState.some((c) => c.id === ct.id))
+                      .map((ct) => (
+                        <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-slate-300">
+                          {ct.name} ({ct.state}, {ct.country})
+                        </option>
+                      ))}
+                  </optgroup>
+                </>
+              ) : (
+                allCities.map((ct) => (
+                  <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                    {ct.name} — {ct.state} ({ct.country})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -514,6 +588,37 @@ export const MapView: React.FC = () => {
             Flood Hotspots
           </button>
         </div>
+      </div>
+
+      {/* Global Quick Deploy Hotspots Row */}
+      <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 px-3 bg-[#0F1A2E]/80 border border-white/10 rounded-lg text-xs font-mono shrink-0 shadow">
+        <span className="text-[#F2B138] font-bold shrink-0 flex items-center gap-1 mr-1">
+          <Zap className="w-3.5 h-3.5" />
+          Quick Deploy:
+        </span>
+        {[
+          { id: 'visakhapatnam', name: 'Visakhapatnam (IN)' },
+          { id: 'mumbai', name: 'Mumbai (IN)' },
+          { id: 'miami', name: 'Miami (US)' },
+          { id: 'los-angeles', name: 'Los Angeles (US)' },
+          { id: 'tokyo', name: 'Tokyo (JP)' },
+          { id: 'manila', name: 'Manila (PH)' },
+          { id: 'london', name: 'London (UK)' },
+          { id: 'sydney', name: 'Sydney (AU)' },
+          { id: 'chittagong', name: 'Chittagong (BD)' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setSelectedCity(item.id)}
+            className={`px-2.5 py-1 rounded text-[11px] whitespace-nowrap transition-all border ${
+              activeCity?.id === item.id
+                ? 'bg-[#2E9CCA] text-[#0B1220] font-bold border-[#2E9CCA] shadow-md'
+                : 'bg-[#152238] hover:bg-[#1f3152] text-slate-300 hover:text-white border-white/10'
+            }`}
+          >
+            {item.name}
+          </button>
+        ))}
       </div>
 
       {/* Map Canvas Viewport */}

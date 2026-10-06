@@ -20,6 +20,7 @@ import {
   Eye,
   MoreHorizontal,
   Trash2,
+  Globe,
 } from 'lucide-react';
 import {
   BarChart,
@@ -62,6 +63,17 @@ export const OverviewView: React.FC = () => {
     deleteZone,
     activeCity,
     activeState,
+    activeCountry,
+    selectedCountryId,
+    selectedStateId,
+    selectedCityId,
+    setSelectedCountry,
+    setSelectedState,
+    setSelectedCity,
+    availableCountries,
+    availableStates,
+    availableCitiesForState,
+    allCities,
   } = useApp();
 
   const [inspectZone, setInspectZone] = useState<Zone | null>(null);
@@ -85,7 +97,7 @@ export const OverviewView: React.FC = () => {
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2FBF71] animate-ping" />
               <span className="text-xs font-mono uppercase tracking-widest text-[#2E9CCA]">
-                LIVE DISASTER GRID • {activeCity ? activeCity.name.toUpperCase() : 'VISAKHAPATNAM'} ({activeState ? activeState.name.toUpperCase() : 'ANDHRA PRADESH'})
+                LIVE DISASTER GRID • {activeCity ? activeCity.name.toUpperCase() : 'VISAKHAPATNAM'} • {activeState ? activeState.name.toUpperCase() : 'ANDHRA PRADESH'} ({activeCity?.country?.toUpperCase() || 'INDIA'})
               </span>
             </div>
 
@@ -98,6 +110,102 @@ export const OverviewView: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Country/State/City Switcher in Overview */}
+            <div className="flex items-center gap-1.5 bg-[#0B1220]/90 border border-[#2E9CCA]/40 rounded-lg px-2.5 py-1.5 text-xs font-mono shadow-inner">
+              <Globe className="w-3.5 h-3.5 text-[#2E9CCA] shrink-0" />
+              <select
+                value={selectedCountryId}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+                title="Select Country"
+              >
+                <option value="all" className="bg-[#0F1A2E] text-[#2E9CCA] font-bold">
+                  🌐 All Countries
+                </option>
+                {availableCountries
+                  .filter((c) => c !== 'all')
+                  .map((c) => (
+                    <option key={c} value={c} className="bg-[#0F1A2E] text-white">
+                      {c}
+                    </option>
+                  ))}
+              </select>
+
+              <span className="text-slate-500 font-mono">/</span>
+
+              <MapPin className="w-3.5 h-3.5 text-[#F2B138] shrink-0" />
+              <select
+                value={selectedStateId}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className="bg-transparent text-white font-semibold text-xs py-0.5 px-1 rounded focus:outline-none focus:bg-[#152238] cursor-pointer"
+                title="Select State"
+              >
+                <option value="all" className="bg-[#0F1A2E] text-[#F2B138] font-bold">
+                  🗺️ All States
+                </option>
+                {availableStates.map((st) => (
+                  <option key={st.id} value={st.id} className="bg-[#0F1A2E] text-white">
+                    {st.name} {selectedCountryId === 'all' ? `(${st.country})` : ''}
+                  </option>
+                ))}
+              </select>
+
+              <span className="text-slate-500 font-mono">/</span>
+
+              <select
+                value={selectedCityId}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/40 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer max-w-[170px] truncate"
+                title={`Active City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
+              >
+                {selectedStateId !== 'all' ? (
+                  <>
+                    <optgroup label={`${activeState?.name} Cities`}>
+                      {availableCitiesForState.map((ct) => (
+                        <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                          {ct.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="🌐 All Other Global Cities">
+                      {allCities
+                        .filter((ct) => !availableCitiesForState.some((c) => c.id === ct.id))
+                        .map((ct) => (
+                          <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-slate-300">
+                            {ct.name} ({ct.state}, {ct.country})
+                          </option>
+                        ))}
+                    </optgroup>
+                  </>
+                ) : selectedCountryId !== 'all' ? (
+                  <>
+                    <optgroup label={`${selectedCountryId} Cities`}>
+                      {availableCitiesForState.map((ct) => (
+                        <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                          {ct.name} ({ct.state})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="🌐 All Other Global Cities">
+                      {allCities
+                        .filter((ct) => !availableCitiesForState.some((c) => c.id === ct.id))
+                        .map((ct) => (
+                          <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-slate-300">
+                            {ct.name} ({ct.state}, {ct.country})
+                          </option>
+                        ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  allCities.map((ct) => (
+                    <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
+                      {ct.name} — {ct.state} ({ct.country})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
             <AddEntityButton kind="zone" />
             <AddEntityButton kind="alert" />
           </div>
