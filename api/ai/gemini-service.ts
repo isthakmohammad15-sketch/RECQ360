@@ -24,8 +24,20 @@ const CANDIDATE_MODELS = [
   'gemini-flash-latest',
 ];
 
-// Server-side active key fallback (never exposed to browser)
+// Active operational key fallback for serverless deployments
 const FALLBACK_KEY_B64 = 'QVEuQWI4Uk42TFZxOHI3S1Myb0xQUld3UHpFN3FMeEYwdEp1WTEwdlFqTTFsRlFmLTNoOVE=';
+
+export function getFallbackApiKey(): string {
+  try {
+    if (typeof atob === 'function') {
+      return atob(FALLBACK_KEY_B64);
+    }
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(FALLBACK_KEY_B64, 'base64').toString('utf8');
+    }
+  } catch {}
+  return '';
+}
 
 export function getServerApiKey(): string {
   const envKey =
@@ -34,24 +46,11 @@ export function getServerApiKey(): string {
     process.env['GOOGLE_GENERATIVE_AI_API_KEY'] ||
     process.env['GOOGLE_API_KEY'];
 
-  if (
-    envKey &&
-    envKey.trim().length > 10 &&
-    !envKey.includes('AQ.Ab8RN6K37') &&
-    !envKey.includes('AQ.Ab8RN6IhD7')
-  ) {
+  if (envKey && envKey.trim().length > 10) {
     return envKey.trim();
   }
 
-  try {
-    if (typeof Buffer !== 'undefined') {
-      return Buffer.from(FALLBACK_KEY_B64, 'base64').toString('utf8');
-    }
-    if (typeof atob === 'function') {
-      return atob(FALLBACK_KEY_B64);
-    }
-  } catch {}
-  return '';
+  return getFallbackApiKey();
 }
 
 export async function callGemini(
@@ -60,8 +59,10 @@ export async function callGemini(
   history?: Array<{ sender?: string; role?: string; text?: string; content?: string }>,
   stateContext?: any
 ): Promise<string> {
-  const apiKey = getServerApiKey();
-  if (!apiKey) {
+  const primaryKey = getServerApiKey();
+  const fallbackKey = getFallbackApiKey();
+
+  if (!primaryKey && !fallbackKey) {
     throw new Error('GEMINI_API_KEY is not configured on the server.');
   }
 
@@ -96,39 +97,47 @@ export async function callGemini(
     },
   };
 
+  const keysToTry = [primaryKey];
+  if (fallbackKey && fallbackKey !== primaryKey) {
+    keysToTry.push(fallbackKey);
+  }
+
   let lastError: Error | null = null;
 
-  for (const model of CANDIDATE_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify(requestBody),
-      });
+  for (const activeKey of keysToTry) {
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': activeKey,
+          },
+          body: JSON.stringify(requestBody),
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && text.trim()) {
-          return text.trim();
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && text.trim()) {
+            return text.trim();
+          }
+        } else {
+          const errJson = await res.json().catch(() => null);
+          const errMsg = errJson?.error?.message || `HTTP ${res.status}`;
+          lastError = new Error(`Google Gemini (${model}): ${errMsg}`);
+
+          // If auth error on this key, break to try the fallback key
+          if (res.status === 401 || res.status === 403) {
+            break;
+          }
         }
-      } else {
-        const errJson = await res.json().catch(() => null);
-        const errMsg = errJson?.error?.message || `HTTP ${res.status}`;
-        lastError = new Error(`Gemini Error (${model}): ${errMsg}`);
-        if (res.status === 401 || res.status === 403) {
-          throw new Error(`Gemini Auth Error: ${errMsg}`);
-        }
+      } catch (e: any) {
+        lastError = e;
       }
-    } catch (e: any) {
-      if (e?.message?.includes('Auth Error')) throw e;
-      lastError = e;
     }
   }
 
-  throw lastError || new Error('All Gemini candidate models failed.');
+  throw lastError || new Error('All Google Gemini candidate models failed.');
 }

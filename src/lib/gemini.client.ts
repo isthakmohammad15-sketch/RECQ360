@@ -50,11 +50,20 @@ export async function askGemini(
     }),
   });
 
-  const data = await response.json().catch(() => null);
+  const rawText = await response.text();
+  let data: any = null;
+  try {
+    data = JSON.parse(rawText);
+  } catch {}
 
   if (!response.ok || data?.error) {
     const errorMsg =
-      data?.error || `AI server returned an error (HTTP ${response.status} ${response.statusText})`;
+      data?.error ||
+      (rawText && rawText.length < 300 && !rawText.includes('<!DOCTYPE')
+        ? rawText.trim()
+        : `AI server returned an error (HTTP ${response.status}${
+            response.statusText ? ' ' + response.statusText : ''
+          })`);
     throw new Error(errorMsg);
   }
 
@@ -82,11 +91,20 @@ export async function askGeminiSummary(body: {
     body: JSON.stringify(body),
   });
 
-  const data = await response.json().catch(() => null);
+  const rawText = await response.text();
+  let data: any = null;
+  try {
+    data = JSON.parse(rawText);
+  } catch {}
 
   if (!response.ok || data?.error) {
     const errorMsg =
-      data?.error || `AI summary service returned an error (HTTP ${response.status})`;
+      data?.error ||
+      (rawText && rawText.length < 300 && !rawText.includes('<!DOCTYPE')
+        ? rawText.trim()
+        : `AI summary service returned an error (HTTP ${response.status}${
+            response.statusText ? ' ' + response.statusText : ''
+          })`);
     throw new Error(errorMsg);
   }
 
