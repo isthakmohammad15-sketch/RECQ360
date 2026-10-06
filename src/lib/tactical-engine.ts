@@ -447,6 +447,72 @@ ${
 *All officers are instructed to maintain active VHF radio channel 4 check-ins every 30 minutes.*`;
   }
 
+  // 8.5 SPECIFIC ZONE DEEP DIVE (e.g. "Zone 4", "Zone 1", "Seethammadhara", "MVP Colony", etc.)
+  const matchedZone = zones.find(
+    (z) =>
+      q.includes(`zone ${z.number}`) ||
+      q.includes(z.name.toLowerCase()) ||
+      (z.name.toLowerCase().includes(' - ') &&
+        q.includes(z.name.toLowerCase().split(' - ')[1]?.trim()))
+  );
+
+  if (matchedZone) {
+    const zoneShelters = shelters.filter(
+      (s) =>
+        s.zoneId === matchedZone.id ||
+        s.zoneName.toLowerCase().includes(matchedZone.name.toLowerCase())
+    );
+    const zoneAlerts = alerts.filter(
+      (a) =>
+        a.zoneId === matchedZone.id ||
+        a.zoneName.toLowerCase().includes(matchedZone.name.toLowerCase())
+    );
+
+    return `### **RECA Tactical Deep-Dive — ${matchedZone.name}**
+**Command Node:** Sector ${matchedZone.number} Operations | **Readiness Score:** **${matchedZone.readinessScore}% (${matchedZone.status.toUpperCase()})**
+
+#### **1. Sector Incident Commander**
+- **Officer in Charge:** **${matchedZone.officerName || 'Designated Lead'}**
+- **Emergency Mobile:** \`${matchedZone.officerContact || '+91-94401-00000'}\`
+- **Designation / Role:** ${matchedZone.officerRole || 'Zone Zonal Commissioner'}
+- **Vulnerable Population at Risk:** **${(matchedZone.populationAtRisk || 25000).toLocaleString()}** residents
+
+#### **2. Tactical Equipment Inventory**
+- **De-Watering Pumps:** **${matchedZone.pumpsCount?.working ?? 6} of ${matchedZone.pumpsCount?.total ?? 8}** operational
+- **Auxiliary Generators:** **${matchedZone.generatorsCount?.working ?? 4} of ${matchedZone.generatorsCount?.total ?? 5}** operational
+- **Rescue Inflatable Boats:** **${matchedZone.boatsCount?.working ?? 2} of ${matchedZone.boatsCount?.total ?? 2}** operational
+- **Heavy JCB Earthmovers:** **${matchedZone.jcbsCount?.working ?? 3} of ${matchedZone.jcbsCount?.total ?? 3}** operational
+- **Ambulances Fleet:** **${matchedZone.ambulancesCount?.working ?? 4} of ${matchedZone.ambulancesCount?.total ?? 4}** operational
+
+#### **3. Designated Relief Shelters in Sector (${zoneShelters.length})**
+${
+  zoneShelters.length > 0
+    ? zoneShelters
+        .map(
+          (s) =>
+            `- **${s.name}:** Capacity: **${s.capacity}** | Occupancy: **${s.currentOccupancy}** | Status: **${s.status}** | Power Backup: **${
+              s.amenities?.backupPower || s.generatorBackup ? 'VERIFIED' : 'PENDING DG SET'
+            }**`
+        )
+        .join('\n')
+    : `- Primary evacuation camps routed to adjoining sector municipal facilities.`
+}
+
+#### **4. Active Operational Alerts in Sector (${zoneAlerts.length})**
+${
+  zoneAlerts.length > 0
+    ? zoneAlerts
+        .map((a) => `- **[${a.severity.toUpperCase()}] ${a.title}:** ${a.description}`)
+        .join('\n')
+    : `- No critical breaches or unresolved emergency alerts currently logged in this sector.`
+}
+
+#### **5. Sector-Specific Tactical Action Directives**
+1. Ensure all ${matchedZone.generatorsCount?.working ?? 4} auxiliary generators are load-tested and have a minimum 72-hour fuel buffer.
+2. Verify arterial storm drain channels leading out of low-lying settlements are cleared of silt.
+3. Keep emergency response teams synchronized on VHF radio Channel 4 with Sector Commander ${matchedZone.officerName || 'Lead'}.`;
+  }
+
   // 9. DEFAULT / GENERAL TACTICAL INQUIRY
   const activeAlertsCount = alerts.length;
   const criticalCount = criticalAlerts.length;

@@ -38,11 +38,11 @@ You advise officers on disaster and cyclone preparedness across municipal zones:
 Style: crisp, operational, decisive. Use short paragraphs and bullet points. Reference zone names and readiness percentages from the provided live state. Never invent data that is not in the state; if something is unknown, say so and recommend how to verify it.`;
 
 const CANDIDATE_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-2.5-flash',
-  'gemini-3.8-flash',
+  'gemini-flash-latest',
 ];
 
 /**
