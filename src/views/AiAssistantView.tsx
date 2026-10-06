@@ -30,13 +30,6 @@ export interface ChatSession {
 const STORAGE_SESSIONS_KEY = 'recq360_ai_sessions';
 const STORAGE_ACTIVE_ID_KEY = 'recq360_ai_active_session_id';
 
-const createDefaultGreeting = (cityName: string, readiness: number): ChatMessage => ({
-  id: `msg-${Date.now()}`,
-  sender: 'ai',
-  text: `Greetings Officer. I am RECA, connected to live disaster telemetry for **${cityName}** (Readiness: **${readiness}%**).\n\nEnter your operational query below to consult Google Gemini in real time.`,
-  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-});
-
 export const AiAssistantView: React.FC = () => {
   const {
     zones,
@@ -82,10 +75,10 @@ export const AiAssistantView: React.FC = () => {
     }
     const defaultSession: ChatSession = {
       id: `session-${Date.now()}`,
-      title: 'Tactical Briefing',
+      title: 'New Chat',
       createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-      messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness || 78)],
+      messages: [],
     };
     return [defaultSession];
   });
@@ -184,10 +177,10 @@ export const AiAssistantView: React.FC = () => {
   const handleNewChat = () => {
     const newSession: ChatSession = {
       id: `session-${Date.now()}`,
-      title: 'New Tactical Session',
+      title: 'New Chat',
       createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-      messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness)],
+      messages: [],
     };
 
     setSessions((prev) => [newSession, ...prev]);
@@ -209,10 +202,10 @@ export const AiAssistantView: React.FC = () => {
       if (filtered.length === 0) {
         const fresh: ChatSession = {
           id: `session-${Date.now()}`,
-          title: 'Tactical Briefing',
+          title: 'New Chat',
           createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
           updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-          messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness)],
+          messages: [],
         };
         setActiveSessionId(fresh.id);
         return [fresh];
@@ -226,13 +219,13 @@ export const AiAssistantView: React.FC = () => {
 
   // Clear all history
   const handleClearAllHistory = () => {
-    if (window.confirm('Are you sure you want to clear all AI tactical chat history?')) {
+    if (window.confirm('Are you sure you want to clear all AI chat history?')) {
       const fresh: ChatSession = {
         id: `session-${Date.now()}`,
-        title: 'Tactical Briefing',
+        title: 'New Chat',
         createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-        messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness)],
+        messages: [],
       };
       setSessions([fresh]);
       setActiveSessionId(fresh.id);
@@ -311,8 +304,8 @@ export const AiAssistantView: React.FC = () => {
       const errMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: `⚠️ **RECA Tactical Engine Notice:**\n${
-          err?.message || 'Unable to complete live AI request. Please try again.'
+        text: `⚠️ **RECQ360 AI Error:**\n${
+          err?.message || 'Unable to complete AI request. Please try again.'
         }`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
@@ -528,6 +521,20 @@ export const AiAssistantView: React.FC = () => {
 
         {/* Messages Stream */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 font-sans text-sm">
+          {messages.length === 0 && !isSending && (
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 opacity-80">
+              <div className="w-12 h-12 rounded-xl bg-[#7C5CFC]/20 border border-[#7C5CFC]/40 text-[#7C5CFC] flex items-center justify-center shadow-lg">
+                <Bot className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-white font-display font-semibold text-sm">RECQ360 AI Assistant</h3>
+                <p className="text-xs text-slate-400 max-w-md">
+                  Ask anything about disaster operations, zone logistics, emergency protocols, or general questions. Every response is generated live by the AI model.
+                </p>
+              </div>
+            </div>
+          )}
+
           {messages.map((msg) => {
             const isUser = msg.sender === 'user';
             return (
@@ -564,7 +571,7 @@ export const AiAssistantView: React.FC = () => {
               </div>
               <div className="bg-[#0B1220] border border-white/10 rounded-lg p-3 text-xs font-mono text-slate-400 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#7C5CFC] animate-ping" />
-                <span>Google Gemini generating live operational response...</span>
+                <span>AI generating live response...</span>
               </div>
             </div>
           )}
@@ -582,7 +589,7 @@ export const AiAssistantView: React.FC = () => {
         >
           <input
             type="text"
-            placeholder="Ask RECA live (e.g., 'Which zone has the most pending generators?')..."
+            placeholder="Ask RECQ360 AI anything (e.g., 'Who are you?', 'Which zone needs generators?')..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isSending}

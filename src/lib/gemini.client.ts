@@ -1,6 +1,12 @@
-import { Zone, Shelter, Asset, AlertItem, DepartmentProgress, EmergencyContact, DisasterCity } from '../types';
-
-export const STORAGE_AI_KEY = 'recq360_gemini_api_key';
+import {
+  Zone,
+  Shelter,
+  Asset,
+  AlertItem,
+  DepartmentProgress,
+  EmergencyContact,
+  DisasterCity,
+} from '../types';
 
 export interface TacticalStateContext {
   overallReadiness?: number;
@@ -13,246 +19,54 @@ export interface TacticalStateContext {
   emergencyContacts?: EmergencyContact[];
 }
 
-// Safe obfuscated operational key to ensure RECA is always online live across dev and production
-const DEFAULT_KEY_B64 = 'QVEuQWI4Uk42TFZxOHI3S1Myb0xQUld3UHpFN3FMeEYwdEp1WTEwdlFqTTFsRlFmLTNoOVE=';
-
-export function getGeminiApiKey(): string {
-  // 1. Environment variable if available
-  if (typeof import.meta !== 'undefined') {
-    const envKey =
-      import.meta.env?.['VITE_GEMINI_API_KEY'] || import.meta.env?.['GEMINI_API_KEY'];
-    if (
-      envKey &&
-      typeof envKey === 'string' &&
-      envKey.trim().length > 10 &&
-      !envKey.includes('AQ.Ab8RN6K37')
-    ) {
-      return envKey.trim();
-    }
-  }
-
-  // 2. Browser localStorage
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem(STORAGE_AI_KEY);
-    if (saved && saved.trim().length > 10 && !saved.includes('AQ.Ab8RN6K37')) {
-      return saved.trim();
-    }
-  }
-
-  // 3. Operational fallback key
-  try {
-    const fallback = typeof atob === 'function' ? atob(DEFAULT_KEY_B64) : '';
-    if (fallback && typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_AI_KEY, fallback);
-      } catch {
-        // Ignore quota/security errors
-      }
-    }
-    return fallback;
-  } catch {
-    return '';
-  }
-}
-
-export function setGeminiApiKey(key: string): void {
-  if (typeof window !== 'undefined') {
-    if (key.trim()) {
-      localStorage.setItem(STORAGE_AI_KEY, key.trim());
-    } else {
-      localStorage.removeItem(STORAGE_AI_KEY);
-    }
-  }
-}
-
-export function removeGeminiApiKey(): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(STORAGE_AI_KEY);
-  }
-}
-
-const CYCLONE_SYSTEM_PROMPT = `You are RECA, the real-time tactical decision-support AI engine for the RECQ360 Disaster Management Command Center.
-You advise officers on disaster and cyclone preparedness across municipal zones: relief shelters, de-watering pumps, auxiliary diesel generators, rescue boats, JCB earthmovers, ambulances, food/water stock and field inspections.
-Style: authoritative, operational, decisive. Use clear paragraphs and bullet points. Reference real zone names, equipment counts, and readiness percentages from the provided live telemetry state. Never invent data that is not in the state.`;
-
-const CANDIDATE_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-3.7-flash',
-  'gemini-3.8-flash',
-  'gemini-flash-latest',
-];
-
-/**
- * Validates a user-provided Gemini API key with a live test ping.
- */
-export async function verifyGeminiApiKey(
-  testKey?: string
-): Promise<{ valid: boolean; model?: string; error?: string }> {
-  const cleanKey = (testKey && testKey.trim()) || getGeminiApiKey();
-  if (!cleanKey) {
-    return { valid: false, error: 'API key is empty' };
-  }
-
-  let lastError = '';
-
-  for (const model of CANDIDATE_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': cleanKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: 'Respond with: RECA Online' }],
-            },
-          ],
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          return { valid: true, model };
-        }
-      } else {
-        const errJson = await res.json().catch(() => null);
-        lastError = errJson?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-        if (res.status === 401 || res.status === 403) {
-          return { valid: false, error: lastError };
-        }
-      }
-    } catch (e: any) {
-      if (e?.name === 'AbortError') {
-        return { valid: false, error: 'Connection timed out' };
-      }
-      lastError = e?.message || 'Network error';
-    }
-  }
-
-  return { valid: false, error: lastError || 'Unable to connect to Google Gemini API' };
-}
-
-async function executeGeminiRequest(prompt: string, apiKey?: string): Promise<string> {
-  const activeKey = (apiKey && apiKey.trim()) || getGeminiApiKey();
-  if (!activeKey) {
-    throw new Error('RECA Tactical AI requires an active API key.');
-  }
-
-  let lastError: Error | null = null;
-
-  for (const model of CANDIDATE_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': activeKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }],
-            },
-          ],
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => null);
-        const errMsg = errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`;
-        throw new Error(errMsg);
-      }
-
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && text.trim()) {
-        return text.trim();
-      }
-    } catch (e: any) {
-      lastError = e;
-      // If unauthorized, do not retry further models with the same invalid key
-      if (
-        e?.message?.includes('401') ||
-        e?.message?.includes('UNAUTHENTICATED') ||
-        e?.message?.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
-        e?.message?.includes('API_KEY_INVALID')
-      ) {
-        break;
-      }
-    }
-  }
-
-  throw lastError || new Error('Google Gemini API request failed');
+export interface ChatMessageHistoryItem {
+  sender: string;
+  text: string;
 }
 
 /**
- * Ask Google Gemini live with full operational telemetry state context.
+ * Sends user prompt to the real AI model via server-side /api/ai/chat endpoint.
+ * Zero keys are exposed to the browser. Works seamlessly on localhost and Vercel.
  */
 export async function askGemini(
   query: string,
   stateContext?: TacticalStateContext,
-  history?: { sender: string; text: string }[]
+  history?: ChatMessageHistoryItem[]
 ): Promise<string> {
-  const apiKey = getGeminiApiKey();
-
-  // 1. Try serverless endpoint if available
-  try {
-    const res = await fetch('/api/ai/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: query, history, stateContext }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.text) return data.text;
-    }
-  } catch {
-    // Continue to direct Gemini call
+  const cleanQuery = query?.trim();
+  if (!cleanQuery) {
+    throw new Error('Message cannot be empty.');
   }
 
-  // 2. Direct live Gemini API call
-  const prompt = `${CYCLONE_SYSTEM_PROMPT}
+  const response = await fetch('/api/ai/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: cleanQuery,
+      history: history || [],
+      stateContext: stateContext || {},
+    }),
+  });
 
-LIVE OPERATIONAL TELEMETRY STATE:
-${JSON.stringify(stateContext ?? {})}
+  const data = await response.json().catch(() => null);
 
-RECENT CHAT HISTORY:
-${(history ?? [])
-  .slice(-6)
-  .map((m) => `${m.sender.toUpperCase()}: ${m.text}`)
-  .join('\n')}
+  if (!response.ok || data?.error) {
+    const errorMsg =
+      data?.error || `AI server returned an error (HTTP ${response.status} ${response.statusText})`;
+    throw new Error(errorMsg);
+  }
 
-USER QUESTION:
-${query}
+  if (!data?.text || typeof data.text !== 'string' || !data.text.trim()) {
+    throw new Error('AI returned an empty response.');
+  }
 
-Provide a direct, authoritative operational response for the disaster response command center based on the live operational data.`;
-
-  return executeGeminiRequest(prompt, apiKey);
+  return data.text.trim();
 }
 
 /**
- * Generates Executive Daily Readiness Summary live from Gemini.
+ * Generates Executive Daily Readiness Summary from the real AI model via /api/ai/summary.
  */
 export async function askGeminiSummary(body: {
   zoneData: unknown;
@@ -260,32 +74,32 @@ export async function askGeminiSummary(body: {
   overallReadiness: number;
   stateContext?: TacticalStateContext;
 }): Promise<string> {
-  const apiKey = getGeminiApiKey();
+  const response = await fetch('/api/ai/summary', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
-  // 1. Try serverless endpoint first
-  try {
-    const res = await fetch('/api/ai/summary', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.summary) return data.summary;
-    }
-  } catch {
-    // Continue to direct Gemini call
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || data?.error) {
+    const errorMsg =
+      data?.error || `AI summary service returned an error (HTTP ${response.status})`;
+    throw new Error(errorMsg);
   }
 
-  // 2. Direct live Gemini REST API call
-  const prompt = `${CYCLONE_SYSTEM_PROMPT}
+  if (!data?.summary || typeof data.summary !== 'string' || !data.summary.trim()) {
+    throw new Error('AI summary returned an empty response.');
+  }
 
-Write the Executive Daily Readiness Summary for the Commissioner.
-Overall city readiness: ${body.overallReadiness}%.
-Zones: ${JSON.stringify(body.zoneData)}
-Open alerts: ${JSON.stringify(body.alertData)}
-
-Produce 4-6 sentences: current posture, the two weakest zones with the specific bottleneck, and the single highest-priority dispatch action for today. No headings, no markdown lists.`;
-
-  return executeGeminiRequest(prompt, apiKey);
+  return data.summary.trim();
 }
+
+/** Legacy stub for backwards compatibility */
+export function getGeminiApiKey(): string {
+  return '';
+}
+export function setGeminiApiKey(_key: string): void {}
+export function removeGeminiApiKey(): void {}
