@@ -24,9 +24,9 @@ export function getAiProviderAndModel() {
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const geminiKey =
     process.env["GEMINI_API_KEY"] ||
+    process.env["VITE_GEMINI_API_KEY"] ||
     process.env["GOOGLE_GENERATIVE_AI_API_KEY"] ||
-    process.env["GOOGLE_API_KEY"] ||
-    "AQ.Ab8RN6K37VuXMhBrmMhbWcxM67hqH-GAR_vKBvrjv3u4FDPbiQ";
+    process.env["GOOGLE_API_KEY"];
   const openaiKey = process.env["OPENAI_API_KEY"];
   const openrouterKey = process.env["OPENROUTER_API_KEY"];
 

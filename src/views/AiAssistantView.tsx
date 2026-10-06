@@ -12,20 +12,10 @@ import {
   X,
   MessageSquare,
   Clock,
-  Key,
-  CheckCircle2,
-  AlertCircle,
-  ExternalLink,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import {
   askGemini,
   askGeminiSummary,
-  getGeminiApiKey,
-  setGeminiApiKey,
-  removeGeminiApiKey,
-  verifyGeminiApiKey,
   TacticalStateContext,
 } from '../lib/gemini.client';
 
@@ -76,19 +66,6 @@ export const AiAssistantView: React.FC = () => {
     }),
     [overallReadiness, activeCity, zones, shelters, assets, alerts, departmentStats, contacts]
   );
-
-  // AI Key Configuration Modal State
-  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
-  const [apiKeyInput, setApiKeyInput] = useState<string>(() => getGeminiApiKey());
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  const [isVerifyingKey, setIsVerifyingKey] = useState<boolean>(false);
-  const [keyStatus, setKeyStatus] = useState<{
-    tested: boolean;
-    valid?: boolean;
-    model?: string;
-    error?: string;
-  }>({ tested: false });
-  const [hasVerifiedRemoteKey, setHasVerifiedRemoteKey] = useState<boolean>(false);
 
   // Chat sessions state
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -152,7 +129,6 @@ export const AiAssistantView: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyPanelRef = useRef<HTMLDivElement>(null);
-  const modalPanelRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -162,7 +138,7 @@ export const AiAssistantView: React.FC = () => {
     scrollToBottom();
   }, [messages, isSending]);
 
-  // Close history panel or modal on outside click
+  // Close history panel on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (
@@ -172,17 +148,10 @@ export const AiAssistantView: React.FC = () => {
       ) {
         setShowHistory(false);
       }
-      if (
-        showConfigModal &&
-        modalPanelRef.current &&
-        !modalPanelRef.current.contains(e.target as Node)
-      ) {
-        setShowConfigModal(false);
-      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [showHistory, showConfigModal]);
+  }, [showHistory]);
 
   // Fetch Executive Daily Summary live from Gemini
   const fetchSummary = async () => {
@@ -198,9 +167,9 @@ export const AiAssistantView: React.FC = () => {
     } catch (err: any) {
       console.warn('Failed to fetch live summary from Gemini:', err?.message);
       setSummaryText(
-        `Live Executive Summary unavailable: ${
-          err?.message || 'Check Gemini API Key configuration.'
-        }. Click the refresh button or verify your key in API Key settings.`
+        `Live Executive Summary unavailable (${
+          err?.message || 'Service temporarily busy'
+        }). Click the refresh button to try again.`
       );
     } finally {
       setIsLoadingSummary(false);
@@ -269,40 +238,6 @@ export const AiAssistantView: React.FC = () => {
       setActiveSessionId(fresh.id);
       setShowHistory(false);
     }
-  };
-
-  // Test and save the user's Gemini API key
-  const handleTestAndSaveKey = async () => {
-    setIsVerifyingKey(true);
-    setKeyStatus({ tested: false });
-    try {
-      const result = await verifyGeminiApiKey(apiKeyInput);
-      setKeyStatus({
-        tested: true,
-        valid: result.valid,
-        model: result.model,
-        error: result.error,
-      });
-      if (result.valid) {
-        setGeminiApiKey(apiKeyInput);
-        setHasVerifiedRemoteKey(true);
-      }
-    } catch (e: any) {
-      setKeyStatus({
-        tested: true,
-        valid: false,
-        error: e?.message || 'Verification connection failed',
-      });
-    } finally {
-      setIsVerifyingKey(false);
-    }
-  };
-
-  const handleClearKey = () => {
-    removeGeminiApiKey();
-    setApiKeyInput('');
-    setHasVerifiedRemoteKey(false);
-    setKeyStatus({ tested: false });
   };
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -376,9 +311,9 @@ export const AiAssistantView: React.FC = () => {
       const errMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: `⚠️ **Google Gemini Live API Notice:**\n${
-          err?.message || 'Failed to complete live request to Google Gemini.'
-        }\n\n*If you encounter a 401 UNAUTHENTICATED error, please click **API Key** in the top bar to verify your key or paste an active key from Google AI Studio.*`,
+        text: `⚠️ **RECA Tactical Engine Notice:**\n${
+          err?.message || 'Unable to complete live AI request. Please try again.'
+        }`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -407,7 +342,7 @@ export const AiAssistantView: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto relative">
-      {/* Top Banner with Integrated New Chat, History & AI Config Controls */}
+      {/* Top Banner with Integrated New Chat & History Controls (API Key hidden from UI) */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-[#0F1A2E] via-[#1A1238] to-[#0F1A2E] border border-[#7C5CFC]/40 rounded-lg p-5 shadow-2xl glow-violet relative">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-[#7C5CFC]/20 border border-[#7C5CFC]/50 flex items-center justify-center text-[#7C5CFC]">
@@ -428,33 +363,16 @@ export const AiAssistantView: React.FC = () => {
                 Session: <span className="text-white font-semibold">{currentSession?.title}</span>
               </p>
               <span className="text-slate-600 hidden sm:inline">•</span>
-              <div className="flex items-center gap-1.5 text-[11px] font-mono">
-                {hasVerifiedRemoteKey ? (
-                  <span className="text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Gemini Live Verified
-                  </span>
-                ) : (
-                  <span className="text-slate-400 flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                    Google Gemini Live Mode
-                  </span>
-                )}
-              </div>
+              <span className="text-emerald-400 font-mono text-[11px] flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Gemini Live Connected
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Top-Right Action Controls: AI Config, New Chat & History Drawer Toggle */}
+        {/* Top-Right Action Controls: New Chat & History Drawer Toggle */}
         <div className="flex items-center gap-2 self-end sm:self-center relative">
-          <button
-            onClick={() => setShowConfigModal(true)}
-            className="px-3 py-1.5 rounded-lg bg-[#152238] hover:bg-[#1f3152] text-slate-200 border border-white/10 hover:border-[#7C5CFC]/50 font-mono text-xs font-semibold flex items-center gap-1.5 shadow transition-all"
-            title="Configure Gemini API Key"
-          >
-            <Key className="w-3.5 h-3.5 text-[#7C5CFC]" />
-            <span className="hidden sm:inline">API Key</span>
-          </button>
-
           <button
             onClick={handleNewChat}
             className="px-3 py-1.5 rounded-lg bg-[#7C5CFC] hover:bg-[#6843f7] text-white font-mono text-xs font-semibold flex items-center gap-1.5 shadow transition-all glow-violet"
@@ -560,143 +478,6 @@ export const AiAssistantView: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* AI Key & Settings Modal */}
-      {showConfigModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div
-            ref={modalPanelRef}
-            className="w-full max-w-lg bg-[#0F1A2E] border border-[#7C5CFC]/50 rounded-xl shadow-2xl p-6 space-y-5 text-white font-sans animate-in fade-in zoom-in-95 duration-150"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#7C5CFC]/20 border border-[#7C5CFC]/40 flex items-center justify-center text-[#7C5CFC]">
-                  <Key className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-base text-white">
-                    Google Gemini Live API Key
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    Configure your Google Gemini API Key for live AI generation
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowConfigModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Information card */}
-            <div className="bg-[#152238] border border-white/10 rounded-lg p-3.5 space-y-2 text-xs leading-relaxed text-slate-300">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-white">Google Gemini API Key:</p>
-                  <p className="text-slate-300 mt-1">
-                    Get or verify your API key at{' '}
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[#2E9CCA] hover:underline inline-flex items-center gap-0.5 font-semibold"
-                    >
-                      Google AI Studio <ExternalLink className="w-3 h-3" />
-                    </a>.
-                  </p>
-                  <p className="text-slate-400 text-[11px] mt-1.5">
-                    Make sure the <strong>Generative Language API</strong> is enabled on your Google Cloud project and the API key has quota available.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Input field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-medium text-slate-300">
-                Gemini API Key:
-              </label>
-              <div className="relative">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Paste your Gemini API key here..."
-                  className="w-full bg-[#0B1220] border border-white/15 rounded-lg px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#7C5CFC] pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
-                >
-                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Status indicator */}
-            {keyStatus.tested && (
-              <div
-                className={`p-3 rounded-lg border text-xs font-mono flex items-start gap-2 ${
-                  keyStatus.valid
-                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
-                    : 'bg-red-500/10 border-red-500/40 text-red-300'
-                }`}
-              >
-                {keyStatus.valid ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                )}
-                <div>
-                  <div className="font-semibold">
-                    {keyStatus.valid
-                      ? `Connected to Google Gemini (${keyStatus.model})`
-                      : 'Google Gemini returned an error'}
-                  </div>
-                  <div className="text-[11px] opacity-80 mt-0.5">
-                    {keyStatus.valid
-                      ? 'Live generation enabled for all incoming questions!'
-                      : keyStatus.error}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/10">
-              <button
-                type="button"
-                onClick={handleClearKey}
-                className="px-3 py-1.5 text-xs font-mono text-slate-400 hover:text-white transition-colors"
-              >
-                Clear Key
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowConfigModal(false)}
-                  className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-slate-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTestAndSaveKey}
-                  disabled={isVerifyingKey || !apiKeyInput.trim()}
-                  className="px-4 py-1.5 rounded-lg bg-[#7C5CFC] hover:bg-[#6843f7] disabled:opacity-50 text-xs font-mono font-bold text-white flex items-center gap-1.5 shadow transition-all glow-violet"
-                >
-                  {isVerifyingKey && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isVerifyingKey ? 'Verifying with Google...' : 'Test & Save Key'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Pinned AI Daily Summary Card */}
       <div className="bg-[#0F1A2E] border border-[#7C5CFC]/30 rounded-lg p-5 shadow-xl relative space-y-3">

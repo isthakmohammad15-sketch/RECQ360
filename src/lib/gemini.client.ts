@@ -16,11 +16,12 @@ export interface TacticalStateContext {
 export function getGeminiApiKey(): string {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem(STORAGE_AI_KEY);
-    if (saved && saved.trim()) return saved.trim();
+    if (saved && saved.trim() && !saved.includes('AQ.Ab8RN6K37')) return saved.trim();
   }
   return (
-    (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_GEMINI_API_KEY']) ||
-    'AQ.Ab8RN6K37VuXMhBrmMhbWcxM67hqH-GAR_vKBvrjv3u4FDPbiQ'
+    (typeof import.meta !== 'undefined' &&
+      (import.meta.env?.['VITE_GEMINI_API_KEY'] || import.meta.env?.['GEMINI_API_KEY'])) ||
+    ''
   );
 }
 
@@ -45,9 +46,9 @@ You advise officers on disaster and cyclone preparedness across municipal zones:
 Style: authoritative, operational, decisive. Use clear paragraphs and bullet points. Reference real zone names, equipment counts, and readiness percentages from the provided live telemetry state. Never invent data that is not in the state.`;
 
 const CANDIDATE_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-2.5-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
   'gemini-3.8-flash',
   'gemini-flash-latest',
 ];
