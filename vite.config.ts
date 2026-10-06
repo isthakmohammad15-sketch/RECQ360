@@ -27,12 +27,13 @@ function aiDevMiddleware(): Plugin {
           req.on('end', async () => {
             try {
               const body = rawBody ? JSON.parse(rawBody) : {};
-              const { executeAiChat } = await import('./src/lib/ai-gateway.server.ts');
-              const text = await executeAiChat({
-                message: body.message,
-                history: body.history,
-                stateContext: body.stateContext,
-              });
+              const { callGemini } = await import('./api/ai/gemini-service.ts');
+              const text = await callGemini(
+                body.message,
+                body.systemPrompt,
+                body.history,
+                body.stateContext
+              );
               res.statusCode = 200;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ text }));
@@ -60,8 +61,18 @@ function aiDevMiddleware(): Plugin {
           req.on('end', async () => {
             try {
               const body = rawBody ? JSON.parse(rawBody) : {};
-              const { executeAiSummary } = await import('./src/lib/ai-gateway.server.ts');
-              const summary = await executeAiSummary(body);
+              const { callGemini } = await import('./api/ai/gemini-service.ts');
+              const prompt = `Write the Executive Daily Readiness Summary for the Commissioner.
+Overall city readiness: ${body?.overallReadiness ?? 'unknown'}%.
+Zones: ${JSON.stringify(body?.zoneData ?? [])}
+Open alerts: ${JSON.stringify(body?.alertData ?? [])}
+
+Produce 4-6 sentences: current posture, the two weakest zones with the specific bottleneck, and the single highest-priority dispatch action for today. No headings, no markdown lists.`;
+
+              const summary = await callGemini(
+                prompt,
+                "You are the Chief Disaster Operations Advisor for RECQ360 Command Center. Write executive briefing summaries directly, authoritatively, and concisely."
+              );
               res.statusCode = 200;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ summary }));
