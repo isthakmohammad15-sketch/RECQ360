@@ -18,7 +18,6 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
-  Cpu,
 } from 'lucide-react';
 import {
   askGemini,
@@ -27,12 +26,8 @@ import {
   setGeminiApiKey,
   removeGeminiApiKey,
   verifyGeminiApiKey,
-} from '../lib/gemini.client';
-import {
-  generateTacticalResponse,
-  generateTacticalExecutiveSummary,
   TacticalStateContext,
-} from '../lib/tactical-engine';
+} from '../lib/gemini.client';
 
 export interface ChatSession {
   id: string;
@@ -48,11 +43,7 @@ const STORAGE_ACTIVE_ID_KEY = 'recq360_ai_active_session_id';
 const createDefaultGreeting = (cityName: string, readiness: number): ChatMessage => ({
   id: `msg-${Date.now()}`,
   sender: 'ai',
-  text: `Greetings Officer. I am RECA, your tactical decision support engine for **${cityName}**.
-
-City preparedness is currently **${readiness}%**. I have indexed all municipal zones, critical equipment registries, shelter power audits, de-watering pumps, and live telemetry feeds.
-
-How can I assist your operational command today?`,
+  text: `Greetings Officer. I am RECA, connected to live disaster telemetry for **${cityName}** (Readiness: **${readiness}%**).\n\nEnter your operational query below to consult Google Gemini in real time.`,
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 });
 
@@ -114,7 +105,7 @@ export const AiAssistantView: React.FC = () => {
     }
     const defaultSession: ChatSession = {
       id: `session-${Date.now()}`,
-      title: 'Initial Tactical Briefing',
+      title: 'Tactical Briefing',
       createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness || 78)],
@@ -171,7 +162,7 @@ export const AiAssistantView: React.FC = () => {
     scrollToBottom();
   }, [messages, isSending]);
 
-  // Close history panel on outside click
+  // Close history panel or modal on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (
@@ -193,7 +184,7 @@ export const AiAssistantView: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [showHistory, showConfigModal]);
 
-  // Fetch Executive Daily Summary on load
+  // Fetch Executive Daily Summary live from Gemini
   const fetchSummary = async () => {
     setIsLoadingSummary(true);
     try {
@@ -204,9 +195,13 @@ export const AiAssistantView: React.FC = () => {
         stateContext: fullStateContext,
       });
       setSummaryText(summary);
-    } catch (err) {
-      console.error('Failed to fetch summary:', err);
-      setSummaryText(generateTacticalExecutiveSummary(fullStateContext));
+    } catch (err: any) {
+      console.warn('Failed to fetch live summary from Gemini:', err?.message);
+      setSummaryText(
+        `Live Executive Summary unavailable: ${
+          err?.message || 'Check Gemini API Key configuration.'
+        }. Click the refresh button or verify your key in API Key settings.`
+      );
     } finally {
       setIsLoadingSummary(false);
     }
@@ -220,7 +215,7 @@ export const AiAssistantView: React.FC = () => {
   const handleNewChat = () => {
     const newSession: ChatSession = {
       id: `session-${Date.now()}`,
-      title: 'New Tactical Briefing',
+      title: 'New Tactical Session',
       createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness)],
@@ -245,7 +240,7 @@ export const AiAssistantView: React.FC = () => {
       if (filtered.length === 0) {
         const fresh: ChatSession = {
           id: `session-${Date.now()}`,
-          title: 'Initial Tactical Briefing',
+          title: 'Tactical Briefing',
           createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
           updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
           messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness)],
@@ -265,7 +260,7 @@ export const AiAssistantView: React.FC = () => {
     if (window.confirm('Are you sure you want to clear all AI tactical chat history?')) {
       const fresh: ChatSession = {
         id: `session-${Date.now()}`,
-        title: 'Initial Tactical Briefing',
+        title: 'Tactical Briefing',
         createdAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         updatedAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         messages: [createDefaultGreeting(activeCity?.name || 'Visakhapatnam', overallReadiness)],
@@ -303,11 +298,11 @@ export const AiAssistantView: React.FC = () => {
     }
   };
 
-  const handleResetToTelemetry = () => {
+  const handleClearKey = () => {
     removeGeminiApiKey();
     setApiKeyInput('');
     setHasVerifiedRemoteKey(false);
-    setKeyStatus({ tested: true, valid: false, error: 'Switched to Local Telemetry AI Engine' });
+    setKeyStatus({ tested: false });
   };
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -325,8 +320,8 @@ export const AiAssistantView: React.FC = () => {
 
     // Update session title dynamically from the first user question if it's default
     const shouldUpdateTitle =
-      currentSession?.title === 'New Tactical Briefing' ||
-      currentSession?.title === 'Initial Tactical Briefing';
+      currentSession?.title === 'New Tactical Session' ||
+      currentSession?.title === 'Tactical Briefing';
 
     const newTitle = shouldUpdateTitle
       ? query.slice(0, 36).trim() + (query.length > 36 ? '…' : '')
@@ -360,7 +355,7 @@ export const AiAssistantView: React.FC = () => {
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: answer || generateTacticalResponse(query, fullStateContext, [...messages, userMsg]),
+        text: answer,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -376,13 +371,14 @@ export const AiAssistantView: React.FC = () => {
           return s;
         })
       );
-    } catch (err) {
-      console.error('Chat error:', err);
-      // Generate rich, context-aware operational response instead of generic demo text
-      const fallbackMsg: ChatMessage = {
+    } catch (err: any) {
+      console.error('Gemini live call error:', err);
+      const errMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: generateTacticalResponse(query, fullStateContext, [...messages, userMsg]),
+        text: `⚠️ **Google Gemini Live API Notice:**\n${
+          err?.message || 'Failed to complete live request to Google Gemini.'
+        }\n\n*If you encounter a 401 UNAUTHENTICATED error, please click **API Key** in the top bar to verify your key or paste an active key from Google AI Studio.*`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -391,7 +387,7 @@ export const AiAssistantView: React.FC = () => {
           if (s.id === targetSessionId) {
             return {
               ...s,
-              messages: [...s.messages, fallbackMsg],
+              messages: [...s.messages, errMsg],
             };
           }
           return s;
@@ -424,7 +420,7 @@ export const AiAssistantView: React.FC = () => {
               </h1>
               <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7C5CFC]/20 text-[#7C5CFC] font-mono text-[10px] border border-[#7C5CFC]/40">
                 <Sparkles className="w-3 h-3 animate-pulse" />
-                ACTIVE
+                LIVE
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -439,9 +435,8 @@ export const AiAssistantView: React.FC = () => {
                     Gemini Live Verified
                   </span>
                 ) : (
-                  <span className="text-[#7C5CFC] flex items-center gap-1 bg-[#7C5CFC]/15 px-2 py-0.5 rounded border border-[#7C5CFC]/30">
-                    <Cpu className="w-3 h-3 text-[#7C5CFC]" />
-                    Telemetry Intelligence Active
+                  <span className="text-slate-400 flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                    Google Gemini Live Mode
                   </span>
                 )}
               </div>
@@ -482,7 +477,7 @@ export const AiAssistantView: React.FC = () => {
             <span>History ({sessions.length})</span>
           </button>
 
-          {/* ChatGPT-style Floating History Panel */}
+          {/* Floating History Panel */}
           {showHistory && (
             <div
               ref={historyPanelRef}
@@ -580,10 +575,10 @@ export const AiAssistantView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-display font-bold text-base text-white">
-                    RECA AI Engine & Gemini API Key
+                    Google Gemini Live API Key
                   </h3>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    Connect Google AI Studio or use built-in telemetry intelligence
+                    Configure your Google Gemini API Key for live AI generation
                   </p>
                 </div>
               </div>
@@ -595,14 +590,14 @@ export const AiAssistantView: React.FC = () => {
               </button>
             </div>
 
-            {/* Explanation card */}
+            {/* Information card */}
             <div className="bg-[#152238] border border-white/10 rounded-lg p-3.5 space-y-2 text-xs leading-relaxed text-slate-300">
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-white">Google Gemini API Key Requirements:</p>
+                  <p className="font-semibold text-white">Google Gemini API Key:</p>
                   <p className="text-slate-300 mt-1">
-                    Standard Google Gemini keys start with <code className="bg-black/40 px-1 py-0.5 rounded text-amber-300">AIzaSy...</code> from{' '}
+                    Get or verify your API key at{' '}
                     <a
                       href="https://aistudio.google.com/app/apikey"
                       target="_blank"
@@ -613,7 +608,7 @@ export const AiAssistantView: React.FC = () => {
                     </a>.
                   </p>
                   <p className="text-slate-400 text-[11px] mt-1.5">
-                    Temporary or CLI OAuth tokens (<code className="bg-black/40 px-1 py-0.5 rounded">AQ.Ab8...</code>) are rejected by Google with <span className="text-red-400 font-mono">401 ACCESS_TOKEN_TYPE_UNSUPPORTED</span>. If you don't have a Google key, RECA seamlessly uses its internal Tactical Telemetry Engine to give 100% real answers.
+                    Make sure the <strong>Generative Language API</strong> is enabled on your Google Cloud project and the API key has quota available.
                   </p>
                 </div>
               </div>
@@ -622,14 +617,14 @@ export const AiAssistantView: React.FC = () => {
             {/* Input field */}
             <div className="space-y-1.5">
               <label className="text-xs font-mono font-medium text-slate-300">
-                Google Gemini API Key (or paste new key):
+                Gemini API Key:
               </label>
               <div className="relative">
                 <input
                   type={showApiKey ? 'text' : 'password'}
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="AIzaSy..."
+                  placeholder="Paste your Gemini API key here..."
                   className="w-full bg-[#0B1220] border border-white/15 rounded-lg px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#7C5CFC] pr-10"
                 />
                 <button
@@ -648,24 +643,24 @@ export const AiAssistantView: React.FC = () => {
                 className={`p-3 rounded-lg border text-xs font-mono flex items-start gap-2 ${
                   keyStatus.valid
                     ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
-                    : 'bg-amber-500/10 border-amber-500/40 text-amber-200'
+                    : 'bg-red-500/10 border-red-500/40 text-red-300'
                 }`}
               >
                 {keyStatus.valid ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                 )}
                 <div>
                   <div className="font-semibold">
                     {keyStatus.valid
                       ? `Connected to Google Gemini (${keyStatus.model})`
-                      : 'Remote key test did not succeed'}
+                      : 'Google Gemini returned an error'}
                   </div>
                   <div className="text-[11px] opacity-80 mt-0.5">
                     {keyStatus.valid
                       ? 'Live generation enabled for all incoming questions!'
-                      : `${keyStatus.error || 'Google returned an authentication error.'} Telemetry AI Engine will answer with live city data.`}
+                      : keyStatus.error}
                   </div>
                 </div>
               </div>
@@ -675,10 +670,10 @@ export const AiAssistantView: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/10">
               <button
                 type="button"
-                onClick={handleResetToTelemetry}
+                onClick={handleClearKey}
                 className="px-3 py-1.5 text-xs font-mono text-slate-400 hover:text-white transition-colors"
               >
-                Clear Key (Use Telemetry Engine)
+                Clear Key
               </button>
               <div className="flex items-center gap-2">
                 <button
@@ -695,7 +690,7 @@ export const AiAssistantView: React.FC = () => {
                   className="px-4 py-1.5 rounded-lg bg-[#7C5CFC] hover:bg-[#6843f7] disabled:opacity-50 text-xs font-mono font-bold text-white flex items-center gap-1.5 shadow transition-all glow-violet"
                 >
                   {isVerifyingKey && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isVerifyingKey ? 'Testing Key...' : 'Test & Save Key'}</span>
+                  <span>{isVerifyingKey ? 'Verifying with Google...' : 'Test & Save Key'}</span>
                 </button>
               </div>
             </div>
@@ -725,10 +720,10 @@ export const AiAssistantView: React.FC = () => {
         {isLoadingSummary ? (
           <div className="p-4 text-center font-mono text-xs text-slate-400 flex items-center justify-center gap-2">
             <RefreshCw className="w-4 h-4 animate-spin text-[#7C5CFC]" />
-            <span>Analyzing {zones.length} city zones & generating executive briefing...</span>
+            <span>Consulting Google Gemini live for executive summary...</span>
           </div>
         ) : (
-          <p className="text-sm text-slate-200 font-sans leading-relaxed bg-[#0B1220] p-4 rounded border border-white/5">
+          <p className="text-sm text-slate-200 font-sans leading-relaxed bg-[#0B1220] p-4 rounded border border-white/5 whitespace-pre-wrap">
             {summaryText}
           </p>
         )}
@@ -788,7 +783,7 @@ export const AiAssistantView: React.FC = () => {
               </div>
               <div className="bg-[#0B1220] border border-white/10 rounded-lg p-3 text-xs font-mono text-slate-400 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#7C5CFC] animate-ping" />
-                <span>RECA analyzing live tactical telemetry...</span>
+                <span>Google Gemini generating live operational response...</span>
               </div>
             </div>
           )}
@@ -806,7 +801,7 @@ export const AiAssistantView: React.FC = () => {
         >
           <input
             type="text"
-            placeholder="Ask RECA (e.g., 'Which zone has the most pending generators?')..."
+            placeholder="Ask RECA live (e.g., 'Which zone has the most pending generators?')..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isSending}
