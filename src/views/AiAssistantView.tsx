@@ -31,7 +31,7 @@ const STORAGE_ACTIVE_ID_KEY = 'recq360_ai_active_session_id';
 const createDefaultGreeting = (readiness: number): ChatMessage => ({
   id: `msg-${Date.now()}`,
   sender: 'ai',
-  text: `Greetings Officer. I am RECQ360 AI, your tactical decision support engine.
+  text: `Greetings Officer. I am RECA, your tactical decision support engine.
 
 City preparedness is currently **${readiness}%**. I have indexed all municipal zones, critical equipment registries, shelter power audits, and live telemetry feeds.
 
@@ -290,7 +290,7 @@ export const AiAssistantView: React.FC = () => {
       const fallbackMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: `**Tactical AI Assistant (${activeCity?.name || 'Grid'}):** Overall city readiness is currently **${overallReadiness}%**. Active hazard: **${activeCity?.primaryHazard || 'Coastal Storm Surge'}**. Critical response teams, generators, and pump de-watering crews remain on standby.`,
+        text: `**RECA (${activeCity?.name || 'Grid'}):** Overall city readiness is currently **${overallReadiness}%**. Active hazard: **${activeCity?.primaryHazard || 'Coastal Storm Surge'}**. Critical response teams, generators, and pump de-watering crews remain on standby.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -328,7 +328,7 @@ export const AiAssistantView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-display font-bold text-xl sm:text-2xl text-white">
-                AI Tactical Assistant — Gemini 3.6
+                RECA — AI Tactical Assistant
               </h1>
               <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7C5CFC]/20 text-[#7C5CFC] font-mono text-[10px] border border-[#7C5CFC]/40">
                 <Sparkles className="w-3 h-3 animate-pulse" />
@@ -374,7 +374,7 @@ export const AiAssistantView: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-white/10">
                 <div className="flex items-center gap-2 text-white font-display font-bold text-sm">
                   <MessageSquare className="w-4 h-4 text-[#7C5CFC]" />
-                  <span>Tactical Chat History</span>
+                  <span>RECA Chat History</span>
                   <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
                     {sessions.length} saved
                   </span>
@@ -552,7 +552,7 @@ export const AiAssistantView: React.FC = () => {
         >
           <input
             type="text"
-            placeholder="Ask AI Tactical Assistant (e.g., 'Which zone has the most pending generators?')..."
+            placeholder="Ask RECA (e.g., 'Which zone has the most pending generators?')..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isSending}

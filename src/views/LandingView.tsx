@@ -183,7 +183,7 @@ const PreviewSidebar: React.FC = () => {
     { icon: Home, label: 'Shelters' },
     { icon: ClipboardCheck, label: 'Inspections' },
     { icon: Siren, label: 'Alerts' },
-    { icon: Brain, label: 'AI Assistant' },
+    { icon: Brain, label: 'RECA AI' },
     { icon: FileBarChart, label: 'Reports' },
   ];
   return (
@@ -434,8 +434,8 @@ const DashboardPreview: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
 const CAPABILITIES = [
   {
     icon: Brain,
-    title: 'AI Tactical Assistant',
-    body: 'Ask plain-language questions about zone gaps, get prioritised pre-landfall actions and drafted advisories.',
+    title: 'RECA — Tactical AI Assistant',
+    body: 'Ask RECA plain-language questions about zone gaps, get prioritised pre-landfall actions and drafted advisories.',
   },
   {
     icon: MapIcon,

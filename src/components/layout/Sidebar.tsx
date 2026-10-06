@@ -47,7 +47,7 @@ export const Sidebar: React.FC = () => {
       badge: activeCriticalAlerts.length > 0 ? activeCriticalAlerts.length : undefined,
       badgeColor: 'bg-[#E4572E]',
     },
-    { id: 'ai', label: 'AI Tactical Assistant', icon: Bot, highlight: true },
+    { id: 'ai', label: 'RECA AI Assistant', icon: Bot, highlight: true },
     { id: 'reports', label: 'Reports & Analytics', icon: FileSpreadsheet },
     { id: 'admin', label: 'Admin & Role Control', icon: Settings },
   ];
