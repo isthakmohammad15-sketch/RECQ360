@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Zone, Shelter, Asset, HospitalInfo, ReliefCampInfo } from '../../types';
 import { StatusBadge } from './StatusBadge';
+import { ModalPortal } from './ModalPortal';
 import { useApp } from '../../context/AppContext';
 
 export interface InspectDetailModalProps {
@@ -71,8 +72,9 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
     zoneAlerts.forEach((a) => issues.push(`Alert: ${a.title}`));
 
     return (
-      <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-        <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-6 shadow-2xl relative my-auto text-slate-100">
+      <ModalPortal>
+        <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-6 shadow-2xl relative z-[99999] recq-modal-content my-auto text-slate-100">
           {/* Close button */}
           <button
             onClick={onClose}
@@ -351,26 +353,41 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
           </div>
         </div>
       </div>
-    );
-  }
+    </ModalPortal>
+  );
+}
 
   // Render for SHELTER
   if (type === 'shelter') {
     const shelter = data as Shelter;
-    const occupancyPct = Math.round((shelter.currentOccupancy / shelter.capacity) * 100);
+    if (!shelter) return null;
+
+    const capacity = shelter.capacity || 1;
+    const currentOccupancy = shelter.currentOccupancy || 0;
+    const occupancyPct = Math.min(100, Math.round((currentOccupancy / capacity) * 100));
+
+    const amenities = shelter.amenities || {
+      water: false,
+      electricity: false,
+      backupPower: false,
+      foodSupplies: false,
+      medicalKit: false,
+      toilets: false,
+    };
 
     const issues: string[] = [];
-    if (!shelter.amenities.water) issues.push('Drinking Water Deficit');
-    if (!shelter.amenities.electricity) issues.push('Main Power Line Tripped');
-    if (!shelter.amenities.backupPower) issues.push('Generator Backup Down');
-    if (!shelter.amenities.foodSupplies) issues.push('Rations Low');
-    if (!shelter.amenities.medicalKit) issues.push('Medical First Aid Kit Incomplete');
-    if (!shelter.amenities.toilets) issues.push('Sanitation Toilets Maintenance Required');
+    if (!amenities.water) issues.push('Drinking Water Deficit');
+    if (!amenities.electricity) issues.push('Main Power Line Tripped');
+    if (!amenities.backupPower) issues.push('Generator Backup Down');
+    if (!amenities.foodSupplies) issues.push('Rations Low');
+    if (!amenities.medicalKit) issues.push('Medical First Aid Kit Incomplete');
+    if (!amenities.toilets) issues.push('Sanitation Toilets Maintenance Required');
     if (occupancyPct >= 85) issues.push(`Near Capacity Limit (${occupancyPct}%)`);
 
     return (
-      <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-        <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-6 shadow-2xl relative my-auto text-slate-100">
+      <ModalPortal>
+        <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-6 shadow-2xl relative z-[99999] recq-modal-content my-auto text-slate-100">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1.5 rounded-lg bg-[#152238] hover:bg-white/10 text-slate-400 hover:text-white transition-colors border border-white/10"
@@ -381,7 +398,7 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
           <div className="border-b border-white/10 pb-4 pr-10">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="px-2.5 py-0.5 rounded bg-[#2E9CCA]/20 text-[#2E9CCA] font-mono text-xs font-bold border border-[#2E9CCA]/30">
-                {shelter.zoneName}
+                {shelter.zoneName || 'Relief Zone'}
               </span>
               <StatusBadge status={shelter.status} size="sm" />
             </div>
@@ -390,7 +407,7 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
             </h2>
             <p className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-[#2E9CCA]" />
-              <span>{shelter.address}</span>
+              <span>{shelter.address || 'Address not registered'}</span>
             </p>
           </div>
 
@@ -398,16 +415,23 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
           <div className="bg-[#0B1220] p-4 rounded-lg border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
             <div>
               <span className="text-slate-400 text-[10px] uppercase">Shelter Incharge Officer:</span>
-              <div className="text-white font-bold text-sm mt-0.5">{shelter.contactPerson}</div>
+              <div className="text-white font-bold text-sm mt-0.5">{shelter.contactPerson || 'Assigned Officer'}</div>
               <div className="text-slate-400 text-[11px]">Relief Command Authority</div>
             </div>
-            <a
-              href={`tel:${shelter.contactPhone.replace(/\s+/g, '')}`}
-              className="px-3.5 py-2 rounded bg-[#2FBF71]/20 text-[#2FBF71] border border-[#2FBF71]/40 flex items-center gap-2 hover:bg-[#2FBF71]/30 font-bold self-start sm:self-auto"
-            >
-              <Phone className="w-4 h-4" />
-              <span>{shelter.contactPhone}</span>
-            </a>
+            {shelter.contactPhone ? (
+              <a
+                href={`tel:${shelter.contactPhone.replace(/\s+/g, '')}`}
+                className="px-3.5 py-2 rounded bg-[#2FBF71]/20 text-[#2FBF71] border border-[#2FBF71]/40 flex items-center gap-2 hover:bg-[#2FBF71]/30 font-bold self-start sm:self-auto"
+              >
+                <Phone className="w-4 h-4" />
+                <span>{shelter.contactPhone}</span>
+              </a>
+            ) : (
+              <div className="px-3.5 py-2 rounded bg-white/5 text-slate-400 border border-white/10 flex items-center gap-2 font-bold self-start sm:self-auto">
+                <Phone className="w-4 h-4" />
+                <span>No phone listed</span>
+              </div>
+            )}
           </div>
 
           {/* Issues Notice */}
@@ -435,7 +459,7 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
             <div className="flex justify-between items-center">
               <span className="text-slate-400 uppercase text-[10px]">Shelter Occupancy Rate</span>
               <span className={`font-bold text-sm ${occupancyPct >= 80 ? 'text-[#E4572E]' : 'text-[#2FBF71]'}`}>
-                {shelter.currentOccupancy} / {shelter.capacity} evacuees ({occupancyPct}%)
+                {currentOccupancy} / {shelter.capacity || 0} evacuees ({occupancyPct}%)
               </span>
             </div>
             <div className="w-full bg-[#152238] h-3 rounded-full overflow-hidden">
@@ -454,27 +478,27 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
             <div className="grid grid-cols-2 gap-2.5 text-xs font-mono">
               <div className="p-3 rounded bg-[#0B1220] border border-white/5 flex items-center justify-between">
                 <span className="text-slate-300 flex items-center gap-2"><Droplets className="w-4 h-4 text-[#2E9CCA]" /> Drinking Water</span>
-                {shelter.amenities.water ? <span className="text-[#2FBF71] font-bold">READY</span> : <span className="text-[#E4572E] font-bold">DEFICIT</span>}
+                {amenities.water ? <span className="text-[#2FBF71] font-bold">READY</span> : <span className="text-[#E4572E] font-bold">DEFICIT</span>}
               </div>
               <div className="p-3 rounded bg-[#0B1220] border border-white/5 flex items-center justify-between">
                 <span className="text-slate-300 flex items-center gap-2"><Zap className="w-4 h-4 text-[#F2B138]" /> Mains Power</span>
-                {shelter.amenities.electricity ? <span className="text-[#2FBF71] font-bold">ONLINE</span> : <span className="text-[#E4572E] font-bold">TRIPPED</span>}
+                {amenities.electricity ? <span className="text-[#2FBF71] font-bold">ONLINE</span> : <span className="text-[#E4572E] font-bold">TRIPPED</span>}
               </div>
               <div className="p-3 rounded bg-[#0B1220] border border-white/5 flex items-center justify-between">
                 <span className="text-slate-300 flex items-center gap-2"><BatteryCharging className="w-4 h-4 text-[#7C5CFC]" /> Genset Backup</span>
-                {shelter.amenities.backupPower ? <span className="text-[#2FBF71] font-bold">READY</span> : <span className="text-[#E4572E] font-bold">FAILED</span>}
+                {amenities.backupPower ? <span className="text-[#2FBF71] font-bold">READY</span> : <span className="text-[#E4572E] font-bold">FAILED</span>}
               </div>
               <div className="p-3 rounded bg-[#0B1220] border border-white/5 flex items-center justify-between">
                 <span className="text-slate-300 flex items-center gap-2"><Utensils className="w-4 h-4 text-[#2FBF71]" /> Dry Rations</span>
-                {shelter.amenities.foodSupplies ? <span className="text-[#2FBF71] font-bold">STOCKED</span> : <span className="text-[#E4572E] font-bold">LOW</span>}
+                {amenities.foodSupplies ? <span className="text-[#2FBF71] font-bold">STOCKED</span> : <span className="text-[#E4572E] font-bold">LOW</span>}
               </div>
               <div className="p-3 rounded bg-[#0B1220] border border-white/5 flex items-center justify-between">
                 <span className="text-slate-300 flex items-center gap-2"><Stethoscope className="w-4 h-4 text-[#E4572E]" /> Medical Kit</span>
-                {shelter.amenities.medicalKit ? <span className="text-[#2FBF71] font-bold">STOCKED</span> : <span className="text-[#E4572E] font-bold">MISSING</span>}
+                {amenities.medicalKit ? <span className="text-[#2FBF71] font-bold">STOCKED</span> : <span className="text-[#E4572E] font-bold">MISSING</span>}
               </div>
               <div className="p-3 rounded bg-[#0B1220] border border-white/5 flex items-center justify-between">
                 <span className="text-slate-300 flex items-center gap-2"><Bath className="w-4 h-4 text-[#2E9CCA]" /> Sanitation Toilets</span>
-                {shelter.amenities.toilets ? <span className="text-[#2FBF71] font-bold">VERIFIED</span> : <span className="text-[#E4572E] font-bold">BLOCKED</span>}
+                {amenities.toilets ? <span className="text-[#2FBF71] font-bold">VERIFIED</span> : <span className="text-[#E4572E] font-bold">BLOCKED</span>}
               </div>
             </div>
           </div>
@@ -489,8 +513,9 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
           </div>
         </div>
       </div>
-    );
-  }
+    </ModalPortal>
+  );
+}
 
   // Render for ASSET
   if (type === 'asset') {
@@ -504,8 +529,9 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
     };
 
     return (
-      <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-        <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-6 shadow-2xl relative my-auto text-slate-100">
+      <ModalPortal>
+        <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-6 shadow-2xl relative z-[99999] recq-modal-content my-auto text-slate-100">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1.5 rounded-lg bg-[#152238] hover:bg-white/10 text-slate-400 hover:text-white transition-colors border border-white/10"
@@ -654,50 +680,53 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
           )}
         </div>
       </div>
-    );
-  }
+    </ModalPortal>
+  );
+}
 
   // Render for HOSPITAL
   if (type === 'hospital') {
     const hosp = data as HospitalInfo;
     return (
-      <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-        <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-md w-full p-5 space-y-5 shadow-2xl relative my-auto text-slate-100">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-1 rounded bg-[#152238] text-slate-400 hover:text-white"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="border-b border-white/10 pb-3">
-            <span className="px-2.5 py-0.5 rounded bg-[#7C5CFC]/20 text-[#7C5CFC] font-mono text-xs font-bold border border-[#7C5CFC]/30">
-              {zoneContextName || 'Zone Medical Center'}
-            </span>
-            <h2 className="font-display font-bold text-xl text-white mt-1">{hosp.name}</h2>
-            <p className="text-xs text-slate-400 font-mono">Disaster Medical Response Unit</p>
-          </div>
-
-          <div className="bg-[#0B1220] p-4 rounded-lg border border-white/10 space-y-2 font-mono text-xs">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Emergency Beds Available:</span>
-              <span className="text-[#2FBF71] font-bold text-base">{hosp.bedsAvailable} Beds</span>
-            </div>
-            <div className="flex justify-between items-center border-t border-white/5 pt-2">
-              <span className="text-slate-400">Emergency Casualty Line:</span>
-              <a href={`tel:${hosp.emergencyContact}`} className="text-[#2E9CCA] font-bold hover:underline">
-                {hosp.emergencyContact}
-              </a>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button onClick={onClose} className="px-4 py-2 rounded bg-[#2E9CCA] text-white font-mono text-xs font-bold">
-              Done
+      <ModalPortal>
+        <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-md w-full p-5 space-y-5 shadow-2xl relative z-[99999] recq-modal-content my-auto text-slate-100">
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-1 rounded bg-[#152238] text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
             </button>
+
+            <div className="border-b border-white/10 pb-3">
+              <span className="px-2.5 py-0.5 rounded bg-[#7C5CFC]/20 text-[#7C5CFC] font-mono text-xs font-bold border border-[#7C5CFC]/30">
+                {zoneContextName || 'Zone Medical Center'}
+              </span>
+              <h2 className="font-display font-bold text-xl text-white mt-1">{hosp.name}</h2>
+              <p className="text-xs text-slate-400 font-mono">Disaster Medical Response Unit</p>
+            </div>
+
+            <div className="bg-[#0B1220] p-4 rounded-lg border border-white/10 space-y-2 font-mono text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Emergency Beds Available:</span>
+                <span className="text-[#2FBF71] font-bold text-base">{hosp.bedsAvailable} Beds</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-white/5 pt-2">
+                <span className="text-slate-400">Emergency Casualty Line:</span>
+                <a href={`tel:${hosp.emergencyContact}`} className="text-[#2E9CCA] font-bold hover:underline">
+                  {hosp.emergencyContact}
+                </a>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={onClose} className="px-4 py-2 rounded bg-[#2E9CCA] text-white font-mono text-xs font-bold">
+                Done
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </ModalPortal>
     );
   }
 
@@ -707,45 +736,47 @@ export const InspectDetailModal: React.FC<InspectDetailModalProps> = ({
     const occPct = Math.round((camp.occupancy / camp.capacity) * 100);
 
     return (
-      <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-        <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-md w-full p-5 space-y-5 shadow-2xl relative my-auto text-slate-100">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-1 rounded bg-[#152238] text-slate-400 hover:text-white"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="border-b border-white/10 pb-3">
-            <span className="px-2.5 py-0.5 rounded bg-[#2E9CCA]/20 text-[#2E9CCA] font-mono text-xs font-bold border border-[#2E9CCA]/30">
-              {zoneContextName || 'Relief Camp'}
-            </span>
-            <h2 className="font-display font-bold text-xl text-white mt-1">{camp.name}</h2>
-            <p className="text-xs text-slate-400 font-mono">Evacuation &amp; Shelter Center</p>
-          </div>
-
-          <div className="bg-[#0B1220] p-4 rounded-lg border border-white/10 space-y-2 font-mono text-xs">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Current Occupancy Rate:</span>
-              <span className={occPct >= 80 ? 'text-[#E4572E] font-bold' : 'text-[#2FBF71] font-bold'}>
-                {camp.occupancy} / {camp.capacity} ({occPct}%)
-              </span>
-            </div>
-            <div className="w-full bg-[#152238] h-2.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full ${occPct >= 80 ? 'bg-[#E4572E]' : 'bg-[#2FBF71]'}`}
-                style={{ width: `${occPct}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button onClick={onClose} className="px-4 py-2 rounded bg-[#2E9CCA] text-white font-mono text-xs font-bold">
-              Done
+      <ModalPortal>
+        <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-[#0F1A2E] border border-white/20 rounded-xl max-w-md w-full p-5 space-y-5 shadow-2xl relative z-[99999] recq-modal-content my-auto text-slate-100">
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-1 rounded bg-[#152238] text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
             </button>
+
+            <div className="border-b border-white/10 pb-3">
+              <span className="px-2.5 py-0.5 rounded bg-[#2E9CCA]/20 text-[#2E9CCA] font-mono text-xs font-bold border border-[#2E9CCA]/30">
+                {zoneContextName || 'Relief Camp'}
+              </span>
+              <h2 className="font-display font-bold text-xl text-white mt-1">{camp.name}</h2>
+              <p className="text-xs text-slate-400 font-mono">Evacuation &amp; Shelter Center</p>
+            </div>
+
+            <div className="bg-[#0B1220] p-4 rounded-lg border border-white/10 space-y-2 font-mono text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Current Occupancy Rate:</span>
+                <span className={occPct >= 80 ? 'text-[#E4572E] font-bold' : 'text-[#2FBF71] font-bold'}>
+                  {camp.occupancy} / {camp.capacity} ({occPct}%)
+                </span>
+              </div>
+              <div className="w-full bg-[#152238] h-2.5 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${occPct >= 80 ? 'bg-[#E4572E]' : 'bg-[#2FBF71]'}`}
+                  style={{ width: `${occPct}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={onClose} className="px-4 py-2 rounded bg-[#2E9CCA] text-white font-mono text-xs font-bold">
+                Done
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </ModalPortal>
     );
   }
 

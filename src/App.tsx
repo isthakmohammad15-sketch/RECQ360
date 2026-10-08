@@ -15,6 +15,7 @@ import { AiAssistantView } from "./views/AiAssistantView";
 import { ReportsView } from "./views/ReportsView";
 import { AdminView } from "./views/AdminView";
 import { Toaster } from "./components/ui/sonner";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 function CurrentView() {
   const { activeTab, perms } = useApp();
@@ -70,12 +71,14 @@ function RECQ360() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1220] text-white font-sans flex">
+    <div className="h-screen w-full overflow-hidden bg-[#0B1220] text-white font-sans flex">
       <Sidebar />
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-x-hidden">
-          <CurrentView />
+        <main id="main-content" className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+          <ErrorBoundary key={activeTab}>
+            <CurrentView />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

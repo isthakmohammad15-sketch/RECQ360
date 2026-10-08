@@ -87,7 +87,7 @@ export const OverviewView: React.FC = () => {
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2FBF71] animate-ping" />
               <span className="text-xs font-mono uppercase tracking-widest text-[#2E9CCA]">
-                LIVE DISASTER GRID • {activeCity ? activeCity.name.toUpperCase() : 'VISAKHAPATNAM'} • {activeState ? activeState.name.toUpperCase() : 'ANDHRA PRADESH'} ({activeCity?.country?.toUpperCase() || 'INDIA'})
+                LIVE DISASTER GRID • {activeCity ? activeCity.name.toUpperCase() : 'ALL CITIES'} • {activeState ? activeState.name.toUpperCase() : 'ALL STATES'} ({activeCountry && activeCountry !== 'all' ? activeCountry.toUpperCase() : 'GLOBAL'})
               </span>
             </div>
 
@@ -169,7 +169,7 @@ export const OverviewView: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display font-semibold text-base text-white flex items-center gap-2">
             <span>Zonal Preparedness Grid</span>
-            <span className="text-xs font-mono text-slate-400 font-normal">(10 Zones)</span>
+            <span className="text-xs font-mono text-slate-400 font-normal">({zones.length} Zones)</span>
           </h2>
           <span className="text-xs font-mono text-slate-400">Click card for Zone Breakdown</span>
         </div>

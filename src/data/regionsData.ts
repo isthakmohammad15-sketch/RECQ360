@@ -82,61 +82,13 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             assetCount: 4,
             deptBreakdown: {},
           },
-          {
-            id: 'vja-z3',
-            number: 3,
-            name: 'Benz Circle & MG Road Corridor',
-            readinessScore: 90,
-            status: 'ready',
-            pendingTaskCount: 1,
-            officerName: 'Sri K. Madhava Rao',
-            officerContact: '+91 94401 31003',
-            officerRole: 'Zonal Officer (Circle 2)',
-            coordinates: [16.5015, 80.652],
-            populationAtRisk: 35000,
-            shelterCount: 2,
-            assetCount: 3,
-            deptBreakdown: {},
-          },
-          {
-            id: 'vja-z4',
-            number: 4,
-            name: 'Gunadala & Eluru Canal Inflow',
-            readinessScore: 68,
-            status: 'critical',
-            pendingTaskCount: 7,
-            officerName: 'Er. V. Prasad',
-            officerContact: '+91 94401 31004',
-            officerRole: 'Superintendent (Drainage)',
-            coordinates: [16.5185, 80.669],
-            populationAtRisk: 55000,
-            shelterCount: 3,
-            assetCount: 4,
-            deptBreakdown: {},
-          },
-          {
-            id: 'vja-z5',
-            number: 5,
-            name: 'Bhavani Island & Ferry Ghat',
-            readinessScore: 84,
-            status: 'ready',
-            pendingTaskCount: 2,
-            officerName: 'Sri T. Ramesh',
-            officerContact: '+91 94401 31005',
-            officerRole: 'Tourism & Disaster Marshal',
-            coordinates: [16.523, 80.589],
-            populationAtRisk: 12000,
-            shelterCount: 2,
-            assetCount: 6,
-            deptBreakdown: {},
-          },
         ],
         shelters: [
           {
             id: 'vja-s1',
             name: 'Indira Gandhi Municipal Stadium Relief Camp',
-            zoneId: 'vja-z3',
-            zoneName: 'Benz Circle & MG Road Corridor',
+            zoneId: 'vja-z1',
+            zoneName: 'Prakasam Barrage & Riverfront',
             capacity: 3000,
             currentOccupancy: 450,
             status: 'operational',
@@ -150,8 +102,8 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
           {
             id: 'vja-s2',
             name: 'Andhra Loyola Indoor Multipurpose Shelter',
-            zoneId: 'vja-z4',
-            zoneName: 'Gunadala & Eluru Canal Inflow',
+            zoneId: 'vja-z2',
+            zoneName: 'One Town & Durga Ghat Lowlands',
             capacity: 2200,
             currentOccupancy: 280,
             status: 'operational',
@@ -188,8 +140,8 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             type: 'rescue-boat',
             status: 'ready',
             department: 'NDRF 10th Battalion',
-            zoneId: 'vja-z5',
-            zoneName: 'Bhavani Island',
+            zoneId: 'vja-z2',
+            zoneName: 'One Town & Durga Ghat Lowlands',
             location: 'Ferry Ghat Staging Point',
             coordinates: [16.523, 80.589],
             fuelLevel: 100,
@@ -243,22 +195,6 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             populationAtRisk: 25000,
             shelterCount: 3,
             assetCount: 4,
-            deptBreakdown: {},
-          },
-          {
-            id: 'tpt-z2',
-            number: 2,
-            name: 'Karakambadi & Industrial Belt',
-            readinessScore: 85,
-            status: 'ready',
-            pendingTaskCount: 3,
-            officerName: 'Sri B. Chandrasekhar',
-            officerContact: '+91 94401 32002',
-            officerRole: 'Zonal Commissioner',
-            coordinates: [13.655, 79.455],
-            populationAtRisk: 38000,
-            shelterCount: 2,
-            assetCount: 3,
             deptBreakdown: {},
           },
         ],
@@ -341,22 +277,6 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             populationAtRisk: 18000,
             shelterCount: 2,
             assetCount: 4,
-            deptBreakdown: {},
-          },
-          {
-            id: 'kkd-z2',
-            number: 2,
-            name: 'Coringa Mangrove Coastal Buffer',
-            readinessScore: 79,
-            status: 'pending',
-            pendingTaskCount: 4,
-            officerName: 'Smt. T. Lakshmi',
-            officerContact: '+91 94401 34002',
-            officerRole: 'Forest & Coastal Officer',
-            coordinates: [16.892, 82.315],
-            populationAtRisk: 22000,
-            shelterCount: 3,
-            assetCount: 3,
             deptBreakdown: {},
           },
         ],
@@ -446,38 +366,6 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             populationAtRisk: 48000,
             shelterCount: 5,
             assetCount: 6,
-            deptBreakdown: {},
-          },
-          {
-            id: 'pri-z2',
-            number: 2,
-            name: 'Grand Road & Jagannath Temple Corridor',
-            readinessScore: 92,
-            status: 'ready',
-            pendingTaskCount: 1,
-            officerName: 'Sri D. Mohapatra',
-            officerContact: '+91 94370 10002',
-            officerRole: 'Temple Administration & Safety Cell',
-            coordinates: [19.805, 85.824],
-            populationAtRisk: 65000,
-            shelterCount: 4,
-            assetCount: 4,
-            deptBreakdown: {},
-          },
-          {
-            id: 'pri-z3',
-            number: 3,
-            name: 'Balukhand Forest & Marine Drive Belt',
-            readinessScore: 73,
-            status: 'pending',
-            pendingTaskCount: 5,
-            officerName: 'Er. R. K. Nayak',
-            officerContact: '+91 94370 10003',
-            officerRole: 'ODRAF Sector Officer',
-            coordinates: [19.828, 85.865],
-            populationAtRisk: 22000,
-            shelterCount: 3,
-            assetCount: 5,
             deptBreakdown: {},
           },
         ],
@@ -669,22 +557,6 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             assetCount: 8,
             deptBreakdown: {},
           },
-          {
-            id: 'chn-z3',
-            number: 3,
-            name: 'Adyar River Estuary & Saidapet Bridge',
-            readinessScore: 78,
-            status: 'pending',
-            pendingTaskCount: 4,
-            officerName: 'Thiru M. Natarajan',
-            officerContact: '+91 94440 11003',
-            officerRole: 'TNSDMA Field Coordinator',
-            coordinates: [13.018, 80.224],
-            populationAtRisk: 72000,
-            shelterCount: 5,
-            assetCount: 6,
-            deptBreakdown: {},
-          },
         ],
         shelters: [
           {
@@ -824,22 +696,6 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             assetCount: 10,
             deptBreakdown: {},
           },
-          {
-            id: 'mum-z3',
-            number: 3,
-            name: 'Hindmata & Dadar Central Flood Sump',
-            readinessScore: 79,
-            status: 'pending',
-            pendingTaskCount: 4,
-            officerName: 'Smt. Aarti Shinde',
-            officerContact: '+91 98200 11003',
-            officerRole: 'Storm Water Drainage Chief',
-            coordinates: [19.019, 72.843],
-            populationAtRisk: 85000,
-            shelterCount: 5,
-            assetCount: 8,
-            deptBreakdown: {},
-          },
         ],
         shelters: [
           {
@@ -866,8 +722,8 @@ const RAW_DISASTER_REGIONS: DisasterState[] = [
             type: 'de-watering-pump',
             status: 'ready',
             department: 'MCGM Storm Water Drains',
-            zoneId: 'mum-z3',
-            zoneName: 'Hindmata & Dadar',
+            zoneId: 'mum-z2',
+            zoneName: 'Kurla, BKC & Mithi River Basin',
             location: 'Worli Outfall Basin',
             coordinates: [19.015, 72.818],
             fuelLevel: 96,
@@ -1741,149 +1597,155 @@ function enrichCity(city: DisasterCity): DisasterCity {
             assetCount: 6,
             deptBreakdown: {},
           },
-          {
-            id: `${city.id}-z2`,
-            number: 2,
-            name: `${city.name} Low-Lying Storm Drainage Basin`,
-            readinessScore: Math.min(100, Math.max(40, city.readinessScore - 8)),
-            status: 'pending' as const,
-            pendingTaskCount: 4,
-            officerName: 'Field Drainage Supervisor',
-            officerContact: '+1 800-RECQ-02',
-            officerRole: 'Urban Sump Officer',
-            coordinates: [Number((cLat - 0.014).toFixed(4)), Number((cLng + 0.015).toFixed(4))],
-            populationAtRisk: 62000,
-            shelterCount: 3,
-            assetCount: 5,
-            deptBreakdown: {},
-          },
-          {
-            id: `${city.id}-z3`,
-            number: 3,
-            name: `${city.name} Industrial & Harbor Inundation Corridor`,
-            readinessScore: Math.min(100, Math.max(35, city.readinessScore - 14)),
-            status: 'critical' as const,
-            pendingTaskCount: 6,
-            officerName: 'Emergency Logistics Lead',
-            officerContact: '+1 800-RECQ-03',
-            officerRole: 'Disaster Marshal (Circle 3)',
-            coordinates: [Number((cLat + 0.018).toFixed(4)), Number((cLng + 0.022).toFixed(4))],
-            populationAtRisk: 38000,
-            shelterCount: 2,
-            assetCount: 4,
-            deptBreakdown: {},
-          },
         ];
 
-  const shelters: Shelter[] =
-    city.shelters && city.shelters.length > 0
-      ? city.shelters
-      : [
-          {
-            id: `${city.id}-s1`,
-            name: `${city.name} Municipal Disaster Relief Center & Stadium`,
-            zoneId: `${city.id}-z1`,
-            zoneName: `${city.name} Central Zone`,
-            capacity: 3500,
-            currentOccupancy: 420,
-            status: 'operational',
-            coordinates: [Number((cLat + 0.008).toFixed(4)), Number((cLng - 0.006).toFixed(4))],
-            foodWaterStatus: 'Adequate',
-            medicalSupport: true,
-            generatorBackup: true,
-            contactPerson: 'Relief Center Administrator',
-            contactPhone: '+1 800-SHELTER-1',
-          },
-          {
-            id: `${city.id}-s2`,
-            name: `${city.name} Community High School Relief Shelter`,
-            zoneId: `${city.id}-z2`,
-            zoneName: `${city.name} Drainage Basin`,
-            capacity: 2200,
-            currentOccupancy: 310,
-            status: 'operational',
-            coordinates: [Number((cLat - 0.01).toFixed(4)), Number((cLng + 0.011).toFixed(4))],
-            foodWaterStatus: 'Adequate',
-            medicalSupport: true,
-            generatorBackup: true,
-            contactPerson: 'Relief Logistics Coordinator',
-            contactPhone: '+1 800-SHELTER-2',
-          },
-        ];
+  const primaryZoneId = zones[0]?.id || `${city.id}-z1`;
+  const primaryZoneName = zones[0]?.name || `${city.name} Central Zone`;
+  const secondaryZoneId = zones[1]?.id || primaryZoneId;
+  const secondaryZoneName = zones[1]?.name || primaryZoneName;
+  const validZoneIds = new Set(zones.map((z) => z.id));
 
-  const assets: Asset[] =
-    city.assets && city.assets.length > 0
-      ? city.assets
-      : [
-          {
-            id: `${city.id}-a1`,
-            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-PUMP-01`,
-            name: 'High-Volume Heavy Dewatering Pump (120 HP)',
-            type: 'de-watering-pump',
-            status: 'operational',
-            zoneId: `${city.id}-z1`,
-            zoneName: `${city.name} Central Zone`,
-            location: `${city.name} Low-Lying Drainage Outfall`,
-            department: 'Drainage & Irrigation',
-            assignedTo: 'Er. P. Ramanathan',
-            contactPhone: '+1 800-ASSET-01',
-            coordinates: [Number((cLat + 0.006).toFixed(4)), Number((cLng - 0.008).toFixed(4))],
-            fuelLevel: 88,
-            lastInspectionDate: 'Yesterday',
-            workingCondition: 'Good',
-          },
-          {
-            id: `${city.id}-a2`,
-            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-GEN-01`,
-            name: 'Mobile Backup Diesel Generator (250 kVA)',
-            type: 'generator',
-            status: 'operational',
-            zoneId: `${city.id}-z1`,
-            zoneName: `${city.name} Central Zone`,
-            location: `${city.name} Command & Relief HQ`,
-            department: 'Electrical Engineering',
-            assignedTo: 'Tech. S. Narayanan',
-            contactPhone: '+1 800-ASSET-02',
-            coordinates: [Number((cLat + 0.01).toFixed(4)), Number((cLng + 0.005).toFixed(4))],
-            fuelLevel: 94,
-            lastInspectionDate: 'Today',
-            workingCondition: 'Excellent',
-          },
-          {
-            id: `${city.id}-a3`,
-            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-BOAT-01`,
-            name: 'Rapid Deployment Flood Rescue Zodiac Boat',
-            type: 'rescue-boat',
-            status: 'operational',
-            zoneId: `${city.id}-z2`,
-            zoneName: `${city.name} Drainage Basin`,
-            location: `${city.name} Waterways Boat Launch`,
-            department: 'Disaster Response Force',
-            assignedTo: 'Officer M. Kulkarni',
-            contactPhone: '+1 800-ASSET-03',
-            coordinates: [Number((cLat - 0.008).toFixed(4)), Number((cLng - 0.012).toFixed(4))],
-            fuelLevel: 100,
-            lastInspectionDate: 'Today',
-            workingCondition: 'Good',
-          },
-          {
-            id: `${city.id}-a4`,
-            qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-AMB-01`,
-            name: 'Advanced Life Support Emergency Ambulance ALS-01',
-            type: 'ambulance',
-            status: 'operational',
-            zoneId: `${city.id}-z3`,
-            zoneName: `${city.name} Harbor Corridor`,
-            location: `${city.name} General Hospital Trauma Care`,
-            department: 'Public Health',
-            assignedTo: 'Dr. Anita Roy',
-            contactPhone: '+1 800-ASSET-04',
-            coordinates: [Number((cLat + 0.004).toFixed(4)), Number((cLng + 0.014).toFixed(4))],
-            fuelLevel: 92,
-            lastInspectionDate: 'Today',
-            workingCondition: 'Good',
-          },
-        ];
+  const defaultShelters: Shelter[] = [
+    {
+      id: `${city.id}-s1`,
+      name: `${city.name} Municipal Disaster Relief Center & Stadium`,
+      zoneId: primaryZoneId,
+      zoneName: primaryZoneName,
+      capacity: 3500,
+      currentOccupancy: 420,
+      status: 'operational',
+      address: `${city.name} Municipal Disaster Relief Complex & Pavilion`,
+      coordinates: [Number((cLat + 0.008).toFixed(4)), Number((cLng - 0.006).toFixed(4))],
+      foodWaterStatus: 'Adequate',
+      medicalSupport: true,
+      generatorBackup: true,
+      contactPerson: 'Relief Center Administrator',
+      contactPhone: '+1 800-SHELTER-1',
+      amenities: {
+        water: true,
+        electricity: true,
+        backupPower: true,
+        foodSupplies: true,
+        medicalKit: true,
+        toilets: true,
+      },
+    },
+    {
+      id: `${city.id}-s2`,
+      name: `${city.name} Community High School Relief Shelter`,
+      zoneId: secondaryZoneId,
+      zoneName: secondaryZoneName,
+      capacity: 2200,
+      currentOccupancy: 310,
+      status: 'operational',
+      address: `${city.name} Main Sector High School Campus`,
+      coordinates: [Number((cLat - 0.01).toFixed(4)), Number((cLng + 0.011).toFixed(4))],
+      foodWaterStatus: 'Adequate',
+      medicalSupport: true,
+      generatorBackup: true,
+      contactPerson: 'Relief Logistics Coordinator',
+      contactPhone: '+1 800-SHELTER-2',
+      amenities: {
+        water: true,
+        electricity: true,
+        backupPower: true,
+        foodSupplies: true,
+        medicalKit: true,
+        toilets: true,
+      },
+    },
+  ];
+
+  const rawShelters = city.shelters && city.shelters.length > 0 ? city.shelters : defaultShelters;
+  const shelters: Shelter[] = rawShelters.map((sh) => {
+    if (!validZoneIds.has(sh.zoneId)) {
+      return { ...sh, zoneId: primaryZoneId, zoneName: primaryZoneName };
+    }
+    return sh;
+  });
+
+  const defaultAssets: Asset[] = [
+    {
+      id: `${city.id}-a1`,
+      qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-PUMP-01`,
+      name: 'High-Volume Heavy Dewatering Pump (120 HP)',
+      type: 'de-watering-pump',
+      status: 'ready',
+      zoneId: primaryZoneId,
+      zoneName: primaryZoneName,
+      location: `${city.name} Low-Lying Drainage Outfall`,
+      department: 'Drainage & Irrigation',
+      operator: 'Er. P. Ramanathan',
+      operatorName: 'Er. P. Ramanathan',
+      operatorContact: '+1 800-ASSET-01',
+      coordinates: [Number((cLat + 0.006).toFixed(4)), Number((cLng - 0.008).toFixed(4))],
+      fuelLevel: 88,
+      lastInspectionDate: 'Yesterday',
+      maintenanceHistory: [],
+    },
+    {
+      id: `${city.id}-a2`,
+      qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-GEN-01`,
+      name: 'Mobile Backup Diesel Generator (250 kVA)',
+      type: 'generator',
+      status: 'ready',
+      zoneId: primaryZoneId,
+      zoneName: primaryZoneName,
+      location: `${city.name} Command & Relief HQ`,
+      department: 'Electrical Engineering',
+      operator: 'Tech. S. Narayanan',
+      operatorName: 'Tech. S. Narayanan',
+      operatorContact: '+1 800-ASSET-02',
+      coordinates: [Number((cLat + 0.01).toFixed(4)), Number((cLng + 0.005).toFixed(4))],
+      fuelLevel: 94,
+      lastInspectionDate: 'Today',
+      maintenanceHistory: [],
+    },
+    {
+      id: `${city.id}-a3`,
+      qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-BOAT-01`,
+      name: 'Rapid Deployment Flood Rescue Zodiac Boat',
+      type: 'rescue-boat',
+      status: 'ready',
+      zoneId: secondaryZoneId,
+      zoneName: secondaryZoneName,
+      location: `${city.name} Waterways Boat Launch`,
+      department: 'Disaster Response Force',
+      operator: 'Officer M. Kulkarni',
+      operatorName: 'Officer M. Kulkarni',
+      operatorContact: '+1 800-ASSET-03',
+      coordinates: [Number((cLat - 0.008).toFixed(4)), Number((cLng - 0.012).toFixed(4))],
+      fuelLevel: 100,
+      lastInspectionDate: 'Today',
+      maintenanceHistory: [],
+    },
+    {
+      id: `${city.id}-a4`,
+      qrId: `QR-${city.id.slice(0, 3).toUpperCase()}-AMB-01`,
+      name: 'Advanced Life Support Emergency Ambulance ALS-01',
+      type: 'ambulance',
+      status: 'ready',
+      zoneId: secondaryZoneId,
+      zoneName: secondaryZoneName,
+      location: `${city.name} General Hospital Trauma Care`,
+      department: 'Public Health',
+      operator: 'Dr. Anita Roy',
+      operatorName: 'Dr. Anita Roy',
+      operatorContact: '+1 800-ASSET-04',
+      coordinates: [Number((cLat + 0.004).toFixed(4)), Number((cLng + 0.014).toFixed(4))],
+      fuelLevel: 92,
+      lastInspectionDate: 'Today',
+      maintenanceHistory: [],
+    },
+  ];
+
+  const rawAssets = city.assets && city.assets.length > 0 ? city.assets : defaultAssets;
+  const assets: Asset[] = rawAssets.map((ast) => {
+    if (!validZoneIds.has(ast.zoneId)) {
+      return { ...ast, zoneId: primaryZoneId, zoneName: primaryZoneName };
+    }
+    return ast;
+  });
 
   const hotspots =
     city.hotspots && city.hotspots.length > 0
@@ -1907,21 +1769,27 @@ function enrichCity(city: DisasterCity): DisasterCity {
           },
         ];
 
-  const alerts =
-    city.alerts && city.alerts.length > 0
-      ? city.alerts
-      : [
-          {
-            id: `${city.id}-alt-1`,
-            type: 'weather',
-            severity: city.advisorySeverity || 'critical',
-            title: city.currentAdvisory,
-            message: `${city.primaryHazard} in effect across ${city.name}. Response units and rescue brigades on active standby.`,
-            timestamp: formatLiveTimestamp(10),
-            zoneId: `${city.id}-z1`,
-            resolved: false,
-          },
-        ];
+  const defaultAlerts: AlertItem[] = [
+    {
+      id: `${city.id}-alt-1`,
+      severity: city.advisorySeverity || 'critical',
+      title: city.currentAdvisory,
+      description: `${city.primaryHazard} in effect across ${city.name}. Response units and rescue brigades on active standby.`,
+      department: 'Disaster Cell & Comms',
+      timestamp: formatLiveTimestamp(10),
+      zoneId: primaryZoneId,
+      zoneName: primaryZoneName,
+      resolved: false,
+    },
+  ];
+
+  const rawAlerts = city.alerts && city.alerts.length > 0 ? city.alerts : defaultAlerts;
+  const alerts: AlertItem[] = rawAlerts.map((alt) => {
+    if (!validZoneIds.has(alt.zoneId)) {
+      return { ...alt, zoneId: primaryZoneId, zoneName: primaryZoneName };
+    }
+    return alt;
+  });
 
   return {
     ...city,
@@ -1936,7 +1804,58 @@ function enrichCity(city: DisasterCity): DisasterCity {
 function enrichDisasterRegions(states: DisasterState[]): DisasterState[] {
   return states.map((state) => ({
     ...state,
-    cities: state.cities.map(enrichCity),
+    cities: state.cities.map((rawCity) => {
+      const city = enrichCity(rawCity);
+      return {
+        ...city,
+        state: state.name,
+        country: state.country,
+        zones: (city.zones || []).map((z) => ({
+          ...z,
+          cityId: city.id,
+          cityName: city.name,
+          stateId: state.id,
+          stateName: state.name,
+          country: state.country,
+        })),
+        shelters: (city.shelters || []).map((s) => ({
+          ...s,
+          address: s.address || (s.name ? `${s.name}, ${city.name}` : `Relief Center, ${city.name}`),
+          contactPerson: s.contactPerson || 'Relief Officer Incharge',
+          contactPhone: s.contactPhone || '+91 1070',
+          amenities: {
+            water: s.amenities?.water ?? true,
+            electricity: s.amenities?.electricity ?? true,
+            backupPower: s.amenities?.backupPower ?? (s.generatorBackup !== undefined ? !!s.generatorBackup : true),
+            foodSupplies: s.amenities?.foodSupplies ?? true,
+            medicalKit: s.amenities?.medicalKit ?? (s.medicalSupport !== undefined ? !!s.medicalSupport : true),
+            toilets: s.amenities?.toilets ?? true,
+            ...(s.amenities || {}),
+          },
+          cityId: city.id,
+          cityName: city.name,
+          stateId: state.id,
+          stateName: state.name,
+          country: state.country,
+        })),
+        assets: (city.assets || []).map((a) => ({
+          ...a,
+          cityId: city.id,
+          cityName: city.name,
+          stateId: state.id,
+          stateName: state.name,
+          country: state.country,
+        })),
+        alerts: (city.alerts || []).map((al) => ({
+          ...al,
+          cityId: city.id,
+          cityName: city.name,
+          stateId: state.id,
+          stateName: state.name,
+          country: state.country,
+        })),
+      };
+    }),
   }));
 }
 
@@ -1945,6 +1864,105 @@ export const GLOBAL_DISASTER_REGIONS: DisasterState[] = enrichDisasterRegions([
   ...RAW_DISASTER_REGIONS,
   ...ADDITIONAL_GLOBAL_REGIONS,
 ]);
+
+// Get all baseline zones across all regions
+export function getAllZones(): Zone[] {
+  const list: Zone[] = [];
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    for (const c of s.cities) {
+      if (c.zones && c.zones.length > 0) {
+        for (const z of c.zones) {
+          list.push(z);
+        }
+      }
+    }
+  }
+  return list;
+}
+
+// Get all baseline shelters across all regions
+export function getAllShelters(): Shelter[] {
+  const list: Shelter[] = [];
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    for (const c of s.cities) {
+      if (c.shelters && c.shelters.length > 0) {
+        for (const sh of c.shelters) {
+          list.push(sh);
+        }
+      }
+    }
+  }
+  return list;
+}
+
+// Get all baseline assets across all regions
+export function getAllAssets(): Asset[] {
+  const list: Asset[] = [];
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    for (const c of s.cities) {
+      if (c.assets && c.assets.length > 0) {
+        for (const a of c.assets) {
+          list.push(a);
+        }
+      }
+    }
+  }
+  return list;
+}
+
+// Get all baseline alerts across all regions
+export function getAllAlerts(): AlertItem[] {
+  const list: AlertItem[] = [];
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    for (const c of s.cities) {
+      if (c.alerts && c.alerts.length > 0) {
+        for (const al of c.alerts) {
+          list.push(al);
+        }
+      }
+    }
+  }
+  return list;
+}
+
+// Helper to look up zone location metadata
+export function getZoneLocationMeta(zoneId: string): {
+  cityId: string;
+  cityName: string;
+  stateId: string;
+  stateName: string;
+  country: string;
+} {
+  for (const s of GLOBAL_DISASTER_REGIONS) {
+    for (const c of s.cities) {
+      if (c.zones && c.zones.some((z) => z.id === zoneId)) {
+        return {
+          cityId: c.id,
+          cityName: c.name,
+          stateId: s.id,
+          stateName: s.name,
+          country: s.country,
+        };
+      }
+      if (zoneId.startsWith(`${c.id}-`)) {
+        return {
+          cityId: c.id,
+          cityName: c.name,
+          stateId: s.id,
+          stateName: s.name,
+          country: s.country,
+        };
+      }
+    }
+  }
+  return {
+    cityId: 'visakhapatnam',
+    cityName: 'Visakhapatnam',
+    stateId: 'andhra-pradesh',
+    stateName: 'Andhra Pradesh',
+    country: 'India',
+  };
+}
 
 // Helper to look up a city by id across all regions
 export function findCityById(cityId: string): DisasterCity | undefined {

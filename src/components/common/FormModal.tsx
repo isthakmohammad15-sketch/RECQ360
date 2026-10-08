@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Loader2, Save } from 'lucide-react';
+import { ModalPortal } from './ModalPortal';
 
 export type FieldType = 'text' | 'number' | 'textarea' | 'select' | 'checkbox';
 
@@ -96,8 +97,9 @@ export const FormModal: React.FC<FormModalProps> = ({
     'w-full bg-[#0B1220] border border-white/10 rounded px-3 py-2 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-[#2E9CCA]';
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-[#0F1A2E] border border-[#2E9CCA]/30 rounded-lg w-full max-w-2xl shadow-2xl my-8">
+    <ModalPortal>
+      <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-[#0F1A2E] border border-[#2E9CCA]/30 rounded-lg w-full max-w-2xl shadow-2xl my-8 relative z-[99999] recq-modal-content">
         <div className="flex items-start justify-between gap-4 p-5 border-b border-white/10">
           <div>
             <h2 className="font-display font-bold text-lg text-white">{title}</h2>
@@ -192,5 +194,6 @@ export const FormModal: React.FC<FormModalProps> = ({
         </form>
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

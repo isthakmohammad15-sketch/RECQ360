@@ -55,6 +55,13 @@ export interface Zone {
   assetCount: number;
   deptBreakdown: Record<string, ZoneDeptBreakdown>;
 
+  // Location metadata
+  cityId?: string;
+  cityName?: string;
+  stateId?: string;
+  stateName?: string;
+  country?: string;
+
   // Extended Data Fields per zone
   population?: number;
   foodStockQuantity?: string;
@@ -111,6 +118,11 @@ export interface Asset {
   operatorName?: string;
   operatorContact?: string;
   lastMaintenance?: string;
+  cityId?: string;
+  cityName?: string;
+  stateId?: string;
+  stateName?: string;
+  country?: string;
 }
 
 export interface ShelterAmenities {
@@ -138,6 +150,11 @@ export interface Shelter {
   foodWaterStatus?: string;
   medicalSupport?: boolean | string;
   generatorBackup?: boolean;
+  cityId?: string;
+  cityName?: string;
+  stateId?: string;
+  stateName?: string;
+  country?: string;
 }
 
 export interface InspectionRecord {
@@ -167,6 +184,11 @@ export interface AlertItem {
   actionTaken?: string;
   resolvedAt?: string;
   createdAt?: string;
+  cityId?: string;
+  cityName?: string;
+  stateId?: string;
+  stateName?: string;
+  country?: string;
 }
 
 export interface AuditLog {

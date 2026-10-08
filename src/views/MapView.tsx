@@ -99,18 +99,10 @@ export const MapView: React.FC = () => {
   const [showAssets, setShowAssets] = useState<boolean>(true);
   const [showFloodHotspots, setShowFloodHotspots] = useState<boolean>(true);
 
-  // Fallback to active city's own dataset if available, otherwise global context
-  const currentZones = useMemo(() => {
-    return (activeCity?.zones && activeCity.zones.length > 0) ? activeCity.zones : zones;
-  }, [activeCity, zones]);
-
-  const currentShelters = useMemo(() => {
-    return (activeCity?.shelters && activeCity.shelters.length > 0) ? activeCity.shelters : shelters;
-  }, [activeCity, shelters]);
-
-  const currentAssets = useMemo(() => {
-    return (activeCity?.assets && activeCity.assets.length > 0) ? activeCity.assets : assets;
-  }, [activeCity, assets]);
+  // Always use context datasets directly
+  const currentZones = zones;
+  const currentShelters = shelters;
+  const currentAssets = assets;
 
   const currentHotspots = useMemo(() => {
     return (activeCity?.hotspots && activeCity.hotspots.length > 0) ? activeCity.hotspots : FLOOD_HOTSPOTS;
@@ -201,12 +193,29 @@ export const MapView: React.FC = () => {
     }
   }, [basemap, ready]);
 
-  // 3. Smoothly pan/fly whenever active city changes
+  // 3. Smoothly pan/fly whenever location selection changes
   useEffect(() => {
-    if (!ready || !leafletMapRef.current || !activeCity) return;
+    if (!ready || !leafletMapRef.current) return;
     const map = leafletMapRef.current;
-    const center = activeCity.center || DEFAULT_CENTER;
-    const zoom = activeCity.zoom || 12;
+    let center = DEFAULT_CENTER;
+    let zoom = 12;
+
+    if (activeCity?.center) {
+      center = activeCity.center;
+      zoom = activeCity.zoom || 12;
+    } else if (selectedStateId !== 'all' && activeState && activeState.cities.length > 0) {
+      center = activeState.cities[0].center;
+      zoom = 9;
+    } else if (selectedCountryId !== 'all') {
+      const countryCities = allCities.filter((c) => c.country.toLowerCase() === selectedCountryId.toLowerCase());
+      if (countryCities.length > 0) {
+        center = countryCities[0].center;
+        zoom = 6;
+      }
+    } else {
+      center = DEFAULT_CENTER;
+      zoom = 6;
+    }
 
     map.flyTo([center.lat, center.lng], zoom, {
       duration: 0.9,
@@ -218,13 +227,25 @@ export const MapView: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [activeCity, ready]);
+  }, [activeCity, selectedStateId, selectedCountryId, activeState, allCities, ready]);
 
   // Manual recenter
   const handleRecenter = () => {
-    if (!leafletMapRef.current || !activeCity) return;
-    const center = activeCity.center || DEFAULT_CENTER;
-    const zoom = activeCity.zoom || 12;
+    if (!leafletMapRef.current) return;
+    let center = DEFAULT_CENTER;
+    let zoom = 12;
+
+    if (activeCity?.center) {
+      center = activeCity.center;
+      zoom = activeCity.zoom || 12;
+    } else if (selectedStateId !== 'all' && activeState && activeState.cities.length > 0) {
+      center = activeState.cities[0].center;
+      zoom = 9;
+    } else {
+      center = DEFAULT_CENTER;
+      zoom = 6;
+    }
+
     leafletMapRef.current.flyTo([center.lat, center.lng], zoom, { duration: 0.7 });
     setTimeout(() => {
       leafletMapRef.current?.invalidateSize();
@@ -465,11 +486,14 @@ export const MapView: React.FC = () => {
               value={selectedCityId}
               onChange={(e) => setSelectedCity(e.target.value)}
               className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/40 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer max-w-[180px] truncate"
-              title={`Active Map City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
+              title={selectedCityId === 'all' ? 'Viewing All Cities' : `Active Map City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
             >
+              <option value="all" className="bg-[#0F1A2E] text-[#2E9CCA] font-bold">
+                🏙️ All Cities
+              </option>
               {selectedStateId !== 'all' ? (
                 <>
-                  <optgroup label={`${activeState?.name} Cities`}>
+                  <optgroup label={`${activeState?.name || 'State'} Cities`}>
                     {availableCitiesForState.map((ct) => (
                       <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
                         {ct.name}

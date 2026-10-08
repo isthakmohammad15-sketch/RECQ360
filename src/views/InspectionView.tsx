@@ -3,6 +3,7 @@ import { AddEntityButton } from '../components/common/AddEntityButton';
 import { useApp } from '../context/AppContext';
 import { InspectionRecord } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { ModalPortal } from '../components/common/ModalPortal';
 import {
   ClipboardCheck,
   Plus,
@@ -193,8 +194,9 @@ export const InspectionView: React.FC = () => {
 
       {/* New Field Inspection Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0F1A2E] border border-white/20 rounded-lg max-w-lg w-full p-6 space-y-4 shadow-2xl relative">
+        <ModalPortal>
+          <div className="fixed inset-0 z-[99990] recq-modal-backdrop bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-[#0F1A2E] border border-white/20 rounded-lg max-w-lg w-full p-6 space-y-4 shadow-2xl relative z-[99999] recq-modal-content my-auto">
             <button
               onClick={() => setShowAddModal(false)}
               className="absolute top-4 right-4 p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
@@ -333,7 +335,8 @@ export const InspectionView: React.FC = () => {
             </form>
           </div>
         </div>
-      )}
-    </div>
-  );
+      </ModalPortal>
+    )}
+  </div>
+);
 };

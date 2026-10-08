@@ -60,7 +60,7 @@ export const TopBar: React.FC = () => {
   const activeCriticalAlerts = alerts.filter((a) => !a.resolved && a.severity === 'critical');
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0F1A2E]/95 backdrop-blur border-b border-white/10 px-4 lg:px-6 py-2.5 flex items-center justify-between shadow-lg">
+    <header className="shrink-0 sticky top-0 z-40 bg-[#0F1A2E]/95 backdrop-blur border-b border-white/10 px-4 lg:px-6 py-2.5 flex items-center justify-between shadow-lg">
       {/* Left branding & live warning info */}
       <div className="flex items-center gap-3 md:gap-4 flex-wrap">
         <div className="flex items-center gap-2">
@@ -131,11 +131,14 @@ export const TopBar: React.FC = () => {
             value={selectedCityId}
             onChange={(e) => setSelectedCity(e.target.value)}
             className="bg-[#2E9CCA]/15 text-[#2E9CCA] font-bold text-xs py-0.5 px-1.5 rounded border border-[#2E9CCA]/30 focus:outline-none focus:bg-[#2E9CCA] focus:text-[#0B1220] cursor-pointer max-w-[170px] truncate"
-            title={`Active City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
+            title={selectedCityId === 'all' ? 'Viewing All Cities' : `Active City: ${activeCity?.name} (${activeCity?.state}, ${activeCity?.country})`}
           >
+            <option value="all" className="bg-[#0F1A2E] text-[#2E9CCA] font-bold">
+              🏙️ All Cities
+            </option>
             {selectedStateId !== 'all' ? (
               <>
-                <optgroup label={`${activeState?.name} Cities`}>
+                <optgroup label={`${activeState?.name || 'State'} Cities`}>
                   {availableCitiesForState.map((ct) => (
                     <option key={ct.id} value={ct.id} className="bg-[#0F1A2E] text-white">
                       {ct.name}
@@ -182,28 +185,36 @@ export const TopBar: React.FC = () => {
         </div>
 
         {/* Dynamic Threat / Advisory Badge + Timing beside it */}
-        {activeCity && (
-          <div className="hidden lg:flex items-center gap-2">
-            <div
-              className={`flex items-center gap-2 px-2.5 py-1 rounded border text-xs font-mono ${
-                activeCity.advisorySeverity === 'critical'
+        <div className="hidden lg:flex items-center gap-2">
+          <div
+            className={`flex items-center gap-2 px-2.5 py-1 rounded border text-xs font-mono ${
+              activeCity
+                ? activeCity.advisorySeverity === 'critical'
                   ? 'border-[#E4572E]/40 bg-[#E4572E]/10 text-[#E4572E] glow-red'
                   : activeCity.advisorySeverity === 'warning'
                   ? 'border-[#F2B138]/40 bg-[#F2B138]/10 text-[#F2B138]'
                   : 'border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA]'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
-              <span>{activeCity.currentAdvisory}</span>
-            </div>
-
-            {/* Live Timing directly beside the Advisory */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0B1220] border border-white/10 text-slate-300 font-mono text-xs shadow-inner">
-              <Clock className="w-3.5 h-3.5 text-[#2E9CCA]" />
-              <span>{timeString}</span>
-            </div>
+                : 'border-[#2E9CCA]/40 bg-[#2E9CCA]/10 text-[#2E9CCA]'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
+            <span>
+              {activeCity
+                ? activeCity.currentAdvisory
+                : selectedStateId !== 'all'
+                ? `${(activeState?.name || 'REGIONAL').toUpperCase()} REGIONAL COMMAND`
+                : selectedCountryId !== 'all'
+                ? `${selectedCountryId.toUpperCase()} NATIONAL COMMAND`
+                : 'GLOBAL DISASTER COMMAND ACTIVE'}
+            </span>
           </div>
-        )}
+
+          {/* Live Timing directly beside the Advisory */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0B1220] border border-white/10 text-slate-300 font-mono text-xs shadow-inner">
+            <Clock className="w-3.5 h-3.5 text-[#2E9CCA]" />
+            <span>{timeString}</span>
+          </div>
+        </div>
       </div>
 
       {/* Right controls */}

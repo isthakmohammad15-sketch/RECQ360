@@ -49,6 +49,11 @@ import {
   getStatesForCountry,
   getAllCities,
   getFilteredCities,
+  getAllZones,
+  getAllShelters,
+  getAllAssets,
+  getAllAlerts,
+  getZoneLocationMeta,
 } from '../data/regionsData';
 
 const STORAGE_PREFIX = 'cyclone360.local_';
@@ -248,6 +253,8 @@ interface AppContextType {
   zones: Zone[];
   assets: Asset[];
   shelters: Shelter[];
+  sheltersError: string | null;
+  refreshData: () => Promise<void>;
   inspections: InspectionRecord[];
   alerts: AlertItem[];
   auditLogs: AuditLog[];
@@ -284,8 +291,8 @@ interface AppContextType {
   selectedCountryId: string;
   selectedStateId: string;
   selectedCityId: string;
-  activeCity: DisasterCity;
-  activeState: DisasterState;
+  activeCity: DisasterCity | null;
+  activeState: DisasterState | null;
   activeCountry: string;
   setSelectedCountry: (country: string) => void;
   setSelectedState: (stateId: string) => void;
@@ -332,16 +339,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (typeof window !== 'undefined' && localStorage.getItem('recq360_state_id')) || 'all';
   });
   const [selectedCityId, setSelectedCityId] = useState<string>(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('recq360_city_id')) || DEFAULT_CITY_ID;
+    return (typeof window !== 'undefined' && localStorage.getItem('recq360_city_id')) || 'all';
   });
 
-  const allCities = useMemo(() => {
-    return getAllCities();
-  }, []);
+  const [rawZones, setRawZones] = useState<Zone[]>(() => getAllZones());
+  const [rawAssets, setRawAssets] = useState<Asset[]>(() => getAllAssets());
+  const [rawShelters, setRawShelters] = useState<Shelter[]>(() => getAllShelters());
+  const [rawAlerts, setRawAlerts] = useState<AlertItem[]>(() => getAllAlerts());
+  const [sheltersError, setSheltersError] = useState<string | null>(null);
+
+  const allCities = useMemo<DisasterCity[]>(() => {
+    const baseline = getAllCities();
+    const map = new Map<string, DisasterCity>();
+    baseline.forEach((c) => map.set(c.id, c));
+
+    // Dynamically include any cities registered in rawZones / database
+    rawZones.forEach((z) => {
+      if (z.cityId && !map.has(z.cityId)) {
+        map.set(z.cityId, {
+          id: z.cityId,
+          name: z.cityName || z.cityId,
+          state: z.stateName || z.stateId || 'Operational Region',
+          country: z.country || 'India',
+          center: { lat: z.coordinates?.[0] || 17.7285, lng: z.coordinates?.[1] || 83.2885 },
+          zoom: 12,
+          primaryHazard: 'Regional Emergency Grid',
+          currentAdvisory: 'LIVE MONITORING ACTIVE',
+          advisorySeverity: 'info',
+          readinessScore: z.readinessScore || 75,
+          zones: [z],
+          shelters: [],
+          assets: [],
+          hotspots: [],
+          alerts: [],
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [rawZones]);
 
   const availableCountries = useMemo(() => {
-    return ['all', ...getAllCountries()];
-  }, []);
+    const set = new Set<string>();
+    allCities.forEach((c) => {
+      if (c.country) set.add(c.country);
+    });
+    getAllCountries().forEach((c) => set.add(c));
+    return ['all', ...Array.from(set)];
+  }, [allCities]);
 
   const availableStates = useMemo(() => {
     if (selectedCountryId && selectedCountryId !== 'all') {
@@ -351,30 +396,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [selectedCountryId]);
 
   const availableCitiesForState = useMemo(() => {
-    return getFilteredCities(selectedCountryId, selectedStateId);
-  }, [selectedCountryId, selectedStateId]);
+    let list = allCities;
+    if (selectedCountryId && selectedCountryId !== 'all') {
+      list = list.filter((c) => c.country.toLowerCase() === selectedCountryId.toLowerCase());
+    }
+    if (selectedStateId && selectedStateId !== 'all') {
+      const stateObj = GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId);
+      list = list.filter(
+        (c) =>
+          c.state.toLowerCase() === (stateObj?.name.toLowerCase() || selectedStateId.toLowerCase()) ||
+          (c as any).stateId === selectedStateId,
+      );
+    }
+    return list;
+  }, [allCities, selectedCountryId, selectedStateId]);
 
-  // activeCity is resolved globally from selectedCityId — never locked by overview state!
-  const activeCity = useMemo(() => {
+  const activeCity = useMemo<DisasterCity | null>(() => {
+    if (selectedCityId === 'all') return null;
     return (
       findCityById(selectedCityId) ||
-      findCityById(DEFAULT_CITY_ID) ||
-      GLOBAL_DISASTER_REGIONS[0].cities[0]
+      allCities.find((c) => c.id === selectedCityId) ||
+      null
     );
-  }, [selectedCityId]);
+  }, [selectedCityId, allCities]);
 
-  const activeState = useMemo(() => {
-    const parent = findStateByCityId(activeCity.id);
-    if (parent) return parent;
-    if (selectedStateId && selectedStateId !== 'all') {
-      return GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId) || GLOBAL_DISASTER_REGIONS[0];
+  const activeState = useMemo<DisasterState | null>(() => {
+    if (activeCity) {
+      const parent = findStateByCityId(activeCity.id);
+      if (parent) return parent;
     }
-    return GLOBAL_DISASTER_REGIONS[0];
+    if (selectedStateId && selectedStateId !== 'all') {
+      return GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId) || null;
+    }
+    return null;
   }, [activeCity, selectedStateId]);
 
   const activeCountry = useMemo(() => {
-    return activeCity?.country || activeState?.country || 'India';
-  }, [activeCity, activeState]);
+    if (activeCity?.country) return activeCity.country;
+    if (activeState?.country) return activeState.country;
+    if (selectedCountryId && selectedCountryId !== 'all') return selectedCountryId;
+    return 'all';
+  }, [activeCity, activeState, selectedCountryId]);
 
   const setSelectedCountry = useCallback((country: string) => {
     setSelectedCountryId(country);
@@ -382,32 +444,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (country === 'all') {
       setSelectedStateId('all');
-      if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', 'all');
+      setSelectedCityId('all');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('recq360_state_id', 'all');
+        localStorage.setItem('recq360_city_id', 'all');
+      }
       toast.success('Viewing All Countries', { description: 'Global multi-jurisdiction disaster coverage active' });
     } else {
       const states = getStatesForCountry(country);
-      if (states.length > 0) {
-        if (activeCity.country.toLowerCase() !== country.toLowerCase()) {
-          const firstState = states[0];
-          const firstCity = firstState.cities[0];
-          setSelectedStateId(firstState.id);
-          setSelectedCityId(firstCity.id);
+      if (selectedStateId !== 'all') {
+        const belongsToCountry = states.some((s) => s.id === selectedStateId);
+        if (!belongsToCountry) {
+          setSelectedStateId('all');
+          setSelectedCityId('all');
           if (typeof window !== 'undefined') {
-            localStorage.setItem('recq360_state_id', firstState.id);
-            localStorage.setItem('recq360_city_id', firstCity.id);
+            localStorage.setItem('recq360_state_id', 'all');
+            localStorage.setItem('recq360_city_id', 'all');
           }
-          toast.success(`Country Selected: ${country}`, { description: `Active Grid: ${firstCity.name}, ${firstState.name}` });
-        } else {
-          toast.success(`Country Selected: ${country}`);
         }
       }
+      toast.success(`Country Selected: ${country}`);
     }
-  }, [activeCity]);
+  }, [selectedStateId]);
 
   const setSelectedState = useCallback((stateId: string) => {
     if (stateId === 'all') {
       setSelectedStateId('all');
-      if (typeof window !== 'undefined') localStorage.setItem('recq360_state_id', 'all');
+      setSelectedCityId('all');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('recq360_state_id', 'all');
+        localStorage.setItem('recq360_city_id', 'all');
+      }
       toast.success('Viewing All States', { description: 'All regional commands available' });
       return;
     }
@@ -419,19 +486,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('recq360_state_id', stateId);
       localStorage.setItem('recq360_country_id', state.country);
     }
-    if (!state.cities.some((c) => c.id === selectedCityId)) {
-      if (state.cities.length > 0) {
-        const firstCity = state.cities[0];
-        setSelectedCityId(firstCity.id);
-        if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', firstCity.id);
-        toast.success(`Selected State: ${state.name} (${state.country})`, { description: `Active Grid: ${firstCity.name}` });
-      }
-    } else {
-      toast.success(`Selected State: ${state.name} (${state.country})`);
+    if (selectedCityId !== 'all' && !state.cities.some((c) => c.id === selectedCityId)) {
+      setSelectedCityId('all');
+      if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', 'all');
     }
+    toast.success(`Selected State: ${state.name} (${state.country})`);
   }, [selectedCityId]);
 
   const setSelectedCity = useCallback((cityId: string) => {
+    if (cityId === 'all') {
+      setSelectedCityId('all');
+      if (typeof window !== 'undefined') localStorage.setItem('recq360_city_id', 'all');
+      toast.success('Viewing All Cities');
+      return;
+    }
     const city = findCityById(cityId);
     if (!city) return;
     const parentState = findStateByCityId(cityId);
@@ -451,11 +519,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const [users, setUsers] = useState<User[]>([]);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [inspections, setInspections] = useState<InspectionRecord[]>([]);
-  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistItem[]>([]);
   const [departmentStats, setDepartmentStats] = useState<DepartmentProgress[]>([]);
@@ -495,49 +559,144 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase.from('emergency_contacts').select('*').order('name'),
       ]);
 
-      // 1. ZONES: Merge Supabase cloud records + locally created/modified zones, filtering out deleted
+      // 1. ZONES: Merge baseline regions + Supabase cloud records + locally created/modified zones, filtering out deleted
       const deletedZoneIds = getDeletedRecordIds('zones');
       const localZones = getLocalRecords('zones');
-      const baseZones = (z.data && z.data.length > 0 ? z.data.map(mapZone) : INITIAL_ZONES)
-        .filter((item) => !deletedZoneIds.has(item.id));
+      const baseZones = getAllZones().filter((item) => !deletedZoneIds.has(item.id));
       const mergedZonesMap = new Map<string, Zone>();
       baseZones.forEach((item) => mergedZonesMap.set(item.id, item));
+
+      if (z.data && z.data.length > 0) {
+        z.data.forEach((r: any) => {
+          if (!deletedZoneIds.has(r.id)) {
+            const mapped = mapZone(r);
+            const existing = mergedZonesMap.get(mapped.id);
+            const meta = getZoneLocationMeta(mapped.id);
+            mergedZonesMap.set(mapped.id, {
+              ...existing,
+              ...mapped,
+              cityId: mapped.cityId || existing?.cityId || meta.cityId,
+              cityName: mapped.cityName || existing?.cityName || meta.cityName,
+              stateId: mapped.stateId || existing?.stateId || meta.stateId,
+              stateName: mapped.stateName || existing?.stateName || meta.stateName,
+              country: mapped.country || existing?.country || meta.country,
+            });
+          }
+        });
+      }
+
       localZones.forEach((r) => {
         if (!deletedZoneIds.has(r.id)) {
-          mergedZonesMap.set(r.id, mapZone(r));
+          const mapped = mapZone(r);
+          const existing = mergedZonesMap.get(mapped.id);
+          const meta = getZoneLocationMeta(mapped.id);
+          mergedZonesMap.set(mapped.id, {
+            ...existing,
+            ...mapped,
+            cityId: mapped.cityId || existing?.cityId || meta.cityId,
+            cityName: mapped.cityName || existing?.cityName || meta.cityName,
+            stateId: mapped.stateId || existing?.stateId || meta.stateId,
+            stateName: mapped.stateName || existing?.stateName || meta.stateName,
+            country: mapped.country || existing?.country || meta.country,
+          });
         }
       });
-      setZones(Array.from(mergedZonesMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0)));
+      setRawZones(Array.from(mergedZonesMap.values()).sort((a, b) => (a.number || 0) - (b.number || 0)));
 
       // 2. ASSETS
       const deletedAssetIds = getDeletedRecordIds('assets');
       const localAssets = getLocalRecords('assets');
-      const baseAssets = (a.data && a.data.length > 0 ? a.data.map(mapAsset) : INITIAL_ASSETS).filter(
-        (item) => !deletedAssetIds.has(item.id)
-      );
+      const baseAssets = getAllAssets().filter((item) => !deletedAssetIds.has(item.id));
       const mergedAssetsMap = new Map<string, Asset>();
       baseAssets.forEach((item) => mergedAssetsMap.set(item.id, item));
+
+      if (a.data && a.data.length > 0) {
+        a.data.forEach((r: any) => {
+          if (!deletedAssetIds.has(r.id)) {
+            const mapped = mapAsset(r);
+            const existing = mergedAssetsMap.get(mapped.id);
+            const meta = getZoneLocationMeta(mapped.zoneId || mapped.id);
+            mergedAssetsMap.set(mapped.id, {
+              ...existing,
+              ...mapped,
+              cityId: mapped.cityId || existing?.cityId || meta.cityId,
+              cityName: mapped.cityName || existing?.cityName || meta.cityName,
+              stateId: mapped.stateId || existing?.stateId || meta.stateId,
+              stateName: mapped.stateName || existing?.stateName || meta.stateName,
+              country: mapped.country || existing?.country || meta.country,
+            });
+          }
+        });
+      }
+
       localAssets.forEach((r) => {
         if (!deletedAssetIds.has(r.id)) {
-          mergedAssetsMap.set(r.id, mapAsset(r));
+          const mapped = mapAsset(r);
+          const existing = mergedAssetsMap.get(mapped.id);
+          const meta = getZoneLocationMeta(mapped.zoneId || mapped.id);
+          mergedAssetsMap.set(mapped.id, {
+            ...existing,
+            ...mapped,
+            cityId: mapped.cityId || existing?.cityId || meta.cityId,
+            cityName: mapped.cityName || existing?.cityName || meta.cityName,
+            stateId: mapped.stateId || existing?.stateId || meta.stateId,
+            stateName: mapped.stateName || existing?.stateName || meta.stateName,
+            country: mapped.country || existing?.country || meta.country,
+          });
         }
       });
-      setAssets(Array.from(mergedAssetsMap.values()));
+      setRawAssets(Array.from(mergedAssetsMap.values()));
 
       // 3. SHELTERS
       const deletedShelterIds = getDeletedRecordIds('shelters');
       const localShelters = getLocalRecords('shelters');
-      const baseShelters = (s.data && s.data.length > 0 ? s.data.map(mapShelter) : INITIAL_SHELTERS).filter(
-        (item) => !deletedShelterIds.has(item.id)
-      );
+      const baseShelters = getAllShelters().filter((item) => !deletedShelterIds.has(item.id));
       const mergedSheltersMap = new Map<string, Shelter>();
       baseShelters.forEach((item) => mergedSheltersMap.set(item.id, item));
+
+      if (s.error) {
+        console.warn('[AppContext] Supabase fetch shelters notice:', s.error.message);
+        setSheltersError(s.error.message);
+      } else {
+        setSheltersError(null);
+      }
+
+      if (s.data && s.data.length > 0) {
+        s.data.forEach((r: any) => {
+          if (!deletedShelterIds.has(r.id)) {
+            const mapped = mapShelter(r);
+            const existing = mergedSheltersMap.get(mapped.id);
+            const meta = getZoneLocationMeta(mapped.zoneId || mapped.id);
+            mergedSheltersMap.set(mapped.id, {
+              ...existing,
+              ...mapped,
+              cityId: mapped.cityId || existing?.cityId || meta.cityId,
+              cityName: mapped.cityName || existing?.cityName || meta.cityName,
+              stateId: mapped.stateId || existing?.stateId || meta.stateId,
+              stateName: mapped.stateName || existing?.stateName || meta.stateName,
+              country: mapped.country || existing?.country || meta.country,
+            });
+          }
+        });
+      }
+
       localShelters.forEach((r) => {
         if (!deletedShelterIds.has(r.id)) {
-          mergedSheltersMap.set(r.id, mapShelter(r));
+          const mapped = mapShelter(r);
+          const existing = mergedSheltersMap.get(mapped.id);
+          const meta = getZoneLocationMeta(mapped.zoneId || mapped.id);
+          mergedSheltersMap.set(mapped.id, {
+            ...existing,
+            ...mapped,
+            cityId: mapped.cityId || existing?.cityId || meta.cityId,
+            cityName: mapped.cityName || existing?.cityName || meta.cityName,
+            stateId: mapped.stateId || existing?.stateId || meta.stateId,
+            stateName: mapped.stateName || existing?.stateName || meta.stateName,
+            country: mapped.country || existing?.country || meta.country,
+          });
         }
       });
-      setShelters(Array.from(mergedSheltersMap.values()));
+      setRawShelters(Array.from(mergedSheltersMap.values()));
 
       // 4. INSPECTIONS
       const localInspections = getLocalRecords('inspections');
@@ -550,16 +709,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 5. ALERTS
       const deletedAlertIds = getDeletedRecordIds('alerts');
       const localAlerts = getLocalRecords('alerts');
-      const baseAlerts = (al.data && al.data.length > 0 ? al.data.map(mapAlert) : INITIAL_ALERTS)
-        .filter((item) => !deletedAlertIds.has(item.id));
+      const baseAlerts = getAllAlerts().filter((item) => !deletedAlertIds.has(item.id));
       const mergedAlertsMap = new Map<string, AlertItem>();
       baseAlerts.forEach((item) => mergedAlertsMap.set(item.id, item));
+
+      if (al.data && al.data.length > 0) {
+        al.data.forEach((r: any) => {
+          if (!deletedAlertIds.has(r.id)) {
+            const mapped = mapAlert(r);
+            const existing = mergedAlertsMap.get(mapped.id);
+            const meta = getZoneLocationMeta(mapped.zoneId || mapped.id);
+            mergedAlertsMap.set(mapped.id, {
+              ...existing,
+              ...mapped,
+              cityId: mapped.cityId || existing?.cityId || meta.cityId,
+              cityName: mapped.cityName || existing?.cityName || meta.cityName,
+              stateId: mapped.stateId || existing?.stateId || meta.stateId,
+              stateName: mapped.stateName || existing?.stateName || meta.stateName,
+              country: mapped.country || existing?.country || meta.country,
+            });
+          }
+        });
+      }
+
       localAlerts.forEach((r) => {
         if (!deletedAlertIds.has(r.id)) {
-          mergedAlertsMap.set(r.id, mapAlert(r));
+          const mapped = mapAlert(r);
+          const existing = mergedAlertsMap.get(mapped.id);
+          const meta = getZoneLocationMeta(mapped.zoneId || mapped.id);
+          mergedAlertsMap.set(mapped.id, {
+            ...existing,
+            ...mapped,
+            cityId: mapped.cityId || existing?.cityId || meta.cityId,
+            cityName: mapped.cityName || existing?.cityName || meta.cityName,
+            stateId: mapped.stateId || existing?.stateId || meta.stateId,
+            stateName: mapped.stateName || existing?.stateName || meta.stateName,
+            country: mapped.country || existing?.country || meta.country,
+          });
         }
       });
-      setAlerts(Array.from(mergedAlertsMap.values()));
+      setRawAlerts(Array.from(mergedAlertsMap.values()));
 
       // 6. AUDIT LOGS
       const localLogs = getLocalRecords('audit_logs');
@@ -596,8 +785,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
       setContacts(Array.from(mergedContactsMap.values()));
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[AppContext] loadAll error, keeping active state:', err);
+      setSheltersError(err?.message || 'Database connection error');
     } finally {
       setLoading(false);
     }
@@ -658,40 +848,130 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     void loadAll();
   }, [loadAll]);
 
-  // Synchronize active city datasets across the entire platform
-  useEffect(() => {
-    if (activeCity) {
-      if (activeCity.id !== 'visakhapatnam') {
-        if (activeCity.zones && activeCity.zones.length > 0) {
-          setZones(activeCity.zones);
-        }
-        if (activeCity.shelters && activeCity.shelters.length > 0) {
-          setShelters(activeCity.shelters);
-        }
-        if (activeCity.assets && activeCity.assets.length > 0) {
-          setAssets(activeCity.assets);
-        }
-        if (activeCity.alerts && activeCity.alerts.length > 0) {
-          setAlerts(activeCity.alerts);
-        }
-      } else {
-        void loadAll();
-      }
-    }
-  }, [activeCity, loadAll]);
-
-  // Live updates across every operational table.
+  // Live updates across operational tables via Supabase Realtime with duplicate prevention
   useEffect(() => {
     const channel = supabase
       .channel('cyclone360-live')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        void loadAll();
-      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zones' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const mapped = mapZone(payload.new);
+            setRawZones((prev) => {
+              if (prev.some((z) => z.id === mapped.id)) {
+                return prev.map((z) => (z.id === mapped.id ? { ...z, ...mapped } : z));
+              }
+              return [...prev, mapped].sort((a, b) => (a.number || 0) - (b.number || 0));
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const mapped = mapZone(payload.new);
+            setRawZones((prev) =>
+              prev.map((z) => (z.id === mapped.id ? { ...z, ...mapped } : z))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as any;
+            if (oldRow?.id) {
+              setRawZones((prev) => prev.filter((z) => z.id !== oldRow.id));
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'alerts' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const mapped = mapAlert(payload.new);
+            setRawAlerts((prev) => {
+              if (prev.some((a) => a.id === mapped.id)) {
+                return prev.map((a) => (a.id === mapped.id ? { ...a, ...mapped } : a));
+              }
+              return [mapped, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const mapped = mapAlert(payload.new);
+            setRawAlerts((prev) =>
+              prev.map((a) => (a.id === mapped.id ? { ...a, ...mapped } : a))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as any;
+            if (oldRow?.id) {
+              setRawAlerts((prev) => prev.filter((a) => a.id !== oldRow.id));
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'assets' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const mapped = mapAsset(payload.new);
+            setRawAssets((prev) => {
+              if (prev.some((a) => a.id === mapped.id)) {
+                return prev.map((a) => (a.id === mapped.id ? { ...a, ...mapped } : a));
+              }
+              return [mapped, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const mapped = mapAsset(payload.new);
+            setRawAssets((prev) =>
+              prev.map((a) => (a.id === mapped.id ? { ...a, ...mapped } : a))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as any;
+            if (oldRow?.id) {
+              setRawAssets((prev) => prev.filter((a) => a.id !== oldRow.id));
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shelters' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const mapped = mapShelter(payload.new);
+            setRawShelters((prev) => {
+              if (prev.some((s) => s.id === mapped.id)) {
+                return prev.map((s) => (s.id === mapped.id ? { ...s, ...mapped } : s));
+              }
+              return [mapped, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const mapped = mapShelter(payload.new);
+            setRawShelters((prev) =>
+              prev.map((s) => (s.id === mapped.id ? { ...s, ...mapped } : s))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as any;
+            if (oldRow?.id) {
+              setRawShelters((prev) => prev.filter((s) => s.id !== oldRow.id));
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inspections' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setInspections((prev) => [mapInspection(payload.new), ...prev.filter((i) => i.id !== payload.new.id)]);
+          } else if (payload.eventType === 'UPDATE') {
+            setInspections((prev) => prev.map((i) => (i.id === payload.new.id ? mapInspection(payload.new) : i)));
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as any;
+            if (oldRow?.id) setInspections((prev) => prev.filter((i) => i.id !== oldRow.id));
+          }
+        }
+      )
       .subscribe();
+
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadAll]);
+  }, []);
 
   // Live notification inbox + toast on arrival (signed-in users only).
   useEffect(() => {
@@ -885,6 +1165,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   /* -------------------------------- derived -------------------------------- */
 
+  const matchesGeoFilter = useCallback(
+    (item: { cityId?: string; cityName?: string; stateId?: string; stateName?: string; country?: string; zoneId?: string; id?: string }) => {
+      // 1. Check Country
+      if (selectedCountryId && selectedCountryId !== 'all') {
+        const itemCountry = item.country || '';
+        if (itemCountry.toLowerCase() !== selectedCountryId.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 2. Check State
+      if (selectedStateId && selectedStateId !== 'all') {
+        const stateObj = GLOBAL_DISASTER_REGIONS.find((s) => s.id === selectedStateId);
+        const stateNameExpected = stateObj ? stateObj.name.toLowerCase() : selectedStateId.toLowerCase();
+        const matchesStateId = item.stateId && item.stateId.toLowerCase() === selectedStateId.toLowerCase();
+        const matchesStateName = item.stateName && item.stateName.toLowerCase() === stateNameExpected;
+        if (!matchesStateId && !matchesStateName) {
+          return false;
+        }
+      }
+
+      // 3. Check City
+      if (selectedCityId && selectedCityId !== 'all') {
+        const cityObj = findCityById(selectedCityId) || allCities.find((c) => c.id === selectedCityId);
+        const cityNameExpected = cityObj ? cityObj.name.toLowerCase() : selectedCityId.toLowerCase();
+        const matchesCityId = item.cityId && item.cityId.toLowerCase() === selectedCityId.toLowerCase();
+        const matchesCityName = item.cityName && item.cityName.toLowerCase() === cityNameExpected;
+        if (!matchesCityId && !matchesCityName) {
+          return false;
+        }
+      }
+
+      return true;
+    },
+    [selectedCountryId, selectedStateId, selectedCityId, allCities],
+  );
+
+  const geoFilteredZones = useMemo(
+    () => rawZones.filter((z) => matchesGeoFilter(z)),
+    [rawZones, matchesGeoFilter],
+  );
+  const geoFilteredAssets = useMemo(
+    () => rawAssets.filter((a) => matchesGeoFilter(a)),
+    [rawAssets, matchesGeoFilter],
+  );
+  const geoFilteredShelters = useMemo(
+    () => rawShelters.filter((s) => matchesGeoFilter(s)),
+    [rawShelters, matchesGeoFilter],
+  );
+  const geoFilteredAlerts = useMemo(
+    () => rawAlerts.filter((al) => matchesGeoFilter(al)),
+    [rawAlerts, matchesGeoFilter],
+  );
+
+  const zones = geoFilteredZones;
+  const assets = geoFilteredAssets;
+  const shelters = geoFilteredShelters;
+  const alerts = geoFilteredAlerts;
+
   /* --------------------- role scoping of visible records -------------------- */
 
   const scopeZone = perms.zoneScoped ? (currentUser.zoneId ?? null) : null;
@@ -964,7 +1303,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const overallReadiness = useMemo(() => {
     if (visibleZones.length === 0) return 0;
-    return Math.round(visibleZones.reduce((acc, z) => acc + z.readinessScore, 0) / visibleZones.length);
+    return Math.round(visibleZones.reduce((acc: number, z: Zone) => acc + z.readinessScore, 0) / visibleZones.length);
   }, [visibleZones]);
 
   const navigateTo = (tab: string, params?: { zoneId?: string; assetId?: string; shelterId?: string }) => {
@@ -973,6 +1312,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (params?.assetId !== undefined) setSelectedAssetId(params.assetId);
     if (params?.shelterId !== undefined) setSelectedShelterId(params.shelterId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    const mainEl = document.getElementById('main-content');
+    if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   /* -------------------------------- mutations ------------------------------- */
@@ -1021,11 +1362,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resolveAlert = (alertId: string, actionNotes?: string) => {
     if (!perms.resolveAlerts) return deny('resolve alerts');
     void (async () => {
-      const target = alerts.find((a) => a.id === alertId);
+      const target = rawAlerts.find((a) => a.id === alertId);
       const resolvedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
       const actionTaken = actionNotes || `Resolved by ${currentUser.name} (${currentUser.title})`;
 
-      setAlerts((prev) =>
+      setRawAlerts((prev) =>
         prev.map((a) => (a.id === alertId ? { ...a, resolved: true, actionTaken, resolvedAt } : a)),
       );
 
@@ -1054,15 +1395,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `Resolved alert "${target?.title || alertId}" in ${target?.zoneName || 'the city'}. Notes: ${actionNotes || 'None'}`,
         'alert_action',
       );
-      void loadAll();
     })();
   };
 
   const triggerSimulatedAlert = () => {
     if (!perms.raiseAlerts) return deny('raise alerts');
     void (async () => {
-      if (zones.length === 0) return;
-      const zone = zones[Math.floor(Math.random() * zones.length)]!;
+      const pool = visibleZones.length > 0 ? visibleZones : rawZones;
+      if (pool.length === 0) return;
+      const zone = pool[Math.floor(Math.random() * pool.length)]!;
+      const meta = getZoneLocationMeta(zone.id);
       const row = {
         id: `alt-${Date.now().toString().slice(-6)}`,
         title: `High Wind Gust Threat - ${zone.name}`,
@@ -1070,17 +1412,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Sensor alert: Wind speeds exceeding 65 km/h detected near coastal telemetry node. Emergency teams alerted for power grid triage.',
         zone_id: zone.id,
         zone_name: zone.name,
-        severity: 'warning',
+        severity: 'warning' as const,
         resolved: false,
         department: 'Disaster Cell & Comms',
         created_at: new Date().toISOString(),
+        extra: {
+          cityId: zone.cityId || meta.cityId,
+          cityName: zone.cityName || meta.cityName,
+          stateId: zone.stateId || meta.stateId,
+          stateName: zone.stateName || meta.stateName,
+          country: zone.country || meta.country,
+        },
       };
 
-      setAlerts((prev) => [mapAlert(row), ...prev]);
+      const mapped = mapAlert(row);
+      setRawAlerts((prev) => [mapped, ...prev.filter((a) => a.id !== mapped.id)]);
       saveLocalRecord('alerts', row);
 
       try {
-        await supabase.from('alerts').insert(row);
+        const { extra, ...dbRow } = row;
+        await (supabase.from('alerts') as any).insert(dbRow);
       } catch (e) {
         console.warn('[Supabase] Trigger alert notice:', e);
       }
@@ -1092,14 +1443,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         severity: 'critical',
         linkTab: 'alerts',
       });
-      void loadAll();
     })();
   };
 
   const updateAssetStatus = (assetId: string, status: Asset['status'], notes?: string) => {
     if (!perms.editAssets) return deny('update assets');
     void (async () => {
-      const target = assets.find((a) => a.id === assetId);
+      const target = rawAssets.find((a) => a.id === assetId);
       const stamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
       const history = notes
         ? [
@@ -1114,7 +1464,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ]
         : (target?.maintenanceHistory ?? []);
 
-      setAssets((prev) =>
+      setRawAssets((prev) =>
         prev.map((a) =>
           a.id === assetId
             ? { ...a, status, lastInspectionDate: stamp, maintenanceHistory: history }
@@ -1249,14 +1599,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   /* --------------------------- create operations --------------------------- */
 
-  const zoneName = (id: string) => zones.find((z) => z.id === id)?.name ?? '';
+  const zoneName = (id: string) => rawZones.find((z) => z.id === id)?.name ?? '';
   const num = (v: any, fallback = 0) => (v === '' || v === null || v === undefined ? fallback : Number(v));
 
   const applyLocalInsert = (table: string, row: Record<string, any>) => {
     switch (table) {
       case 'zones': {
         const mapped = mapZone(row);
-        setZones((prev) => {
+        setRawZones((prev) => {
           const filtered = prev.filter((z) => z.id !== mapped.id);
           return [...filtered, mapped].sort((a, b) => (a.number || 0) - (b.number || 0));
         });
@@ -1264,17 +1614,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       case 'assets': {
         const mapped = mapAsset(row);
-        setAssets((prev) => [mapped, ...prev.filter((a) => a.id !== mapped.id)]);
+        setRawAssets((prev) => [mapped, ...prev.filter((a) => a.id !== mapped.id)]);
         break;
       }
       case 'shelters': {
         const mapped = mapShelter(row);
-        setShelters((prev) => [mapped, ...prev.filter((s) => s.id !== mapped.id)]);
+        setRawShelters((prev) => [mapped, ...prev.filter((s) => s.id !== mapped.id)]);
         break;
       }
       case 'alerts': {
         const mapped = mapAlert(row);
-        setAlerts((prev) => [mapped, ...prev.filter((al) => al.id !== mapped.id)]);
+        setRawAlerts((prev) => [mapped, ...prev.filter((al) => al.id !== mapped.id)]);
         break;
       }
       case 'emergency_contacts': {
@@ -1288,7 +1638,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const runInsert = async (table: string, row: Record<string, any>, label: string) => {
     let cloudSaved = false;
     try {
-      const { error } = await (supabase.from(table as never) as any).insert(row);
+      const { extra, ...dbRow } = row;
+      const { error } = await (supabase.from(table as never) as any).insert(dbRow);
       if (error) {
         if (isRlsError(error)) {
           console.warn(`[Supabase RLS] Insert to '${table}' caught by RLS policy. Persisting to local grid.`);
@@ -1318,6 +1669,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createZone: AppContextType['createZone'] = async (v) => {
     if (!perms.editZones) { deny('add zones'); return; }
     const score = Math.max(0, Math.min(100, num(v.readinessScore)));
+    const targetCity = activeCity ? activeCity.id : (selectedCityId !== 'all' ? selectedCityId : 'visakhapatnam');
+    const targetCityObj = findCityById(targetCity) || allCities.find((c) => c.id === targetCity);
+    const targetState = activeState ? activeState.id : (targetCityObj ? (targetCityObj as any).stateId || 'andhra-pradesh' : 'andhra-pradesh');
+    const targetCountry = activeCountry && activeCountry !== 'all' ? activeCountry : (targetCityObj?.country || 'India');
+
     await runInsert(
       'zones',
       {
@@ -1333,6 +1689,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lat: num(v.lat),
         lng: num(v.lng),
         population_at_risk: num(v.populationAtRisk),
+        extra: {
+          cityId: targetCity,
+          cityName: targetCityObj?.name || 'Visakhapatnam',
+          stateId: targetState,
+          stateName: activeState?.name || 'Andhra Pradesh',
+          country: targetCountry,
+        },
       },
       'Zone',
     );
@@ -1343,6 +1706,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!perms.editAssets) { deny('add assets'); return; }
     if (perms.zoneScoped && v.zoneId !== currentUser.zoneId) { deny('add assets outside your zone'); return; }
     const id = `ast-${Date.now().toString().slice(-6)}`;
+    const zMeta = v.zoneId ? getZoneLocationMeta(v.zoneId) : null;
+    const targetCity = activeCity ? activeCity.id : (zMeta?.cityId || (selectedCityId !== 'all' ? selectedCityId : 'visakhapatnam'));
+    const targetCityObj = findCityById(targetCity) || allCities.find((c) => c.id === targetCity);
+    const targetState = activeState ? activeState.id : (zMeta?.stateId || 'andhra-pradesh');
+    const targetCountry = activeCountry && activeCountry !== 'all' ? activeCountry : (zMeta?.country || targetCityObj?.country || 'India');
+
     await runInsert(
       'assets',
       {
@@ -1358,6 +1727,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lat: num(v.lat),
         lng: num(v.lng),
         last_inspection_date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST',
+        extra: {
+          cityId: targetCity,
+          cityName: targetCityObj?.name || zMeta?.cityName || 'Visakhapatnam',
+          stateId: targetState,
+          stateName: activeState?.name || zMeta?.stateName || 'Andhra Pradesh',
+          country: targetCountry,
+        },
       },
       'Asset',
     );
@@ -1367,6 +1743,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createShelter: AppContextType['createShelter'] = async (v) => {
     if (!perms.editShelters) { deny('add shelters'); return; }
     if (perms.zoneScoped && v.zoneId !== currentUser.zoneId) { deny('add shelters outside your zone'); return; }
+    const zMeta = v.zoneId ? getZoneLocationMeta(v.zoneId) : null;
+    const targetCity = activeCity ? activeCity.id : (zMeta?.cityId || (selectedCityId !== 'all' ? selectedCityId : 'visakhapatnam'));
+    const targetCityObj = findCityById(targetCity) || allCities.find((c) => c.id === targetCity);
+    const targetState = activeState ? activeState.id : (zMeta?.stateId || 'andhra-pradesh');
+    const targetCountry = activeCountry && activeCountry !== 'all' ? activeCountry : (zMeta?.country || targetCityObj?.country || 'India');
+
     await runInsert(
       'shelters',
       {
@@ -1390,6 +1772,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           medicalKit: !!v.medicalKit,
           toilets: !!v.toilets,
         },
+        extra: {
+          cityId: targetCity,
+          cityName: targetCityObj?.name || zMeta?.cityName || 'Visakhapatnam',
+          stateId: targetState,
+          stateName: activeState?.name || zMeta?.stateName || 'Andhra Pradesh',
+          country: targetCountry,
+        },
       },
       'Shelter',
     );
@@ -1398,6 +1787,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createAlert: AppContextType['createAlert'] = async (v) => {
     if (!perms.raiseAlerts) { deny('raise alerts'); return; }
+    const zMeta = v.zoneId ? getZoneLocationMeta(v.zoneId) : null;
+    const targetCity = activeCity ? activeCity.id : (zMeta?.cityId || (selectedCityId !== 'all' ? selectedCityId : 'visakhapatnam'));
+    const targetCityObj = findCityById(targetCity) || allCities.find((c) => c.id === targetCity);
+    const targetState = activeState ? activeState.id : (zMeta?.stateId || 'andhra-pradesh');
+    const targetCountry = activeCountry && activeCountry !== 'all' ? activeCountry : (zMeta?.country || targetCityObj?.country || 'India');
+
     await runInsert(
       'alerts',
       {
@@ -1408,6 +1803,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         severity: v.severity,
         department: v.department || null,
         resolved: false,
+        extra: {
+          cityId: targetCity,
+          cityName: targetCityObj?.name || zMeta?.cityName || 'Visakhapatnam',
+          stateId: targetState,
+          stateName: activeState?.name || zMeta?.stateName || 'Andhra Pradesh',
+          country: targetCountry,
+        },
       },
       'Alert',
     );
@@ -1547,9 +1949,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const clamped = Math.max(0, Math.min(100, newScore));
       const status: 'ready' | 'pending' | 'critical' =
         clamped < 60 ? 'critical' : clamped < 80 ? 'pending' : 'ready';
-      const target = zones.find((z) => z.id === zoneId);
+      const target = rawZones.find((z) => z.id === zoneId);
 
-      setZones((prev) =>
+      setRawZones((prev) =>
         prev.map((z) => (z.id === zoneId ? { ...z, readinessScore: clamped, status } : z))
       );
 
@@ -1571,7 +1973,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteZone: AppContextType['deleteZone'] = async (zoneId) => {
     if (!perms.deleteZones) { deny('remove zones'); return; }
-    const target = zones.find((z) => z.id === zoneId);
+    const target = rawZones.find((z) => z.id === zoneId);
 
     try {
       const { error } = await supabase.from('zones').delete().eq('id', zoneId);
@@ -1585,7 +1987,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     removeLocalRecord('zones', zoneId);
     markDeletedRecord('zones', zoneId);
 
-    setZones((prev) => prev.filter((z) => z.id !== zoneId));
+    setRawZones((prev) => prev.filter((z) => z.id !== zoneId));
     if (selectedZoneId === zoneId) setSelectedZoneId(null);
     await writeAudit('Removed Zone', `Removed zone ${target?.name ?? zoneId}`, 'status_override').catch(() => {});
     toast.success(`${target?.name ?? 'Zone'} removed`);
@@ -1617,6 +2019,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         zones: visibleZones,
         assets: visibleAssets,
         shelters: visibleShelters,
+        sheltersError,
+        refreshData: loadAll,
         inspections: visibleInspections,
         alerts: visibleAlerts,
         auditLogs,

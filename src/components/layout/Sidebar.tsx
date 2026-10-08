@@ -53,9 +53,9 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 bg-[#0F1A2E] border-r border-white/10 flex flex-col min-h-screen shrink-0">
+    <aside className="w-64 bg-[#0F1A2E] border-r border-white/10 flex flex-col h-screen shrink-0 sticky top-0 select-none">
       {/* Top App Identity */}
-      <div className="p-4 border-b border-white/10 flex items-center gap-3">
+      <div className="p-4 border-b border-white/10 flex items-center gap-3 shrink-0">
         <div className="w-10 h-10 rounded bg-gradient-to-br from-[#2E9CCA] to-[#7C5CFC] flex items-center justify-center font-display font-bold text-lg text-white shadow-md glow-cyan">
           RQ
         </div>
@@ -67,7 +67,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto min-h-0">
         <div className="px-3 pb-2 text-[10px] font-mono uppercase text-slate-400 tracking-wider">
           Command Modules
         </div>
@@ -121,7 +121,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Footer System Status */}
-      <div className="p-3 border-t border-white/10 bg-[#0B1220]/60">
+      <div className="p-3 border-t border-white/10 bg-[#0B1220]/60 shrink-0">
         <div className="flex items-center gap-2 text-xs font-mono text-slate-300 mb-1">
           <ShieldCheck className="w-4 h-4 text-[#2FBF71]" />
           <span>RECQ360-Integrated</span>
