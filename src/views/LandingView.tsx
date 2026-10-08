@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LoginView } from './LoginView';
-import { ModalPortal } from '../components/common/ModalPortal';
 import { INITIAL_ZONES, INITIAL_ALERTS, INITIAL_DEPARTMENT_STATS } from '../data/seedData';
 
 /* --------------------------------- helpers -------------------------------- */
@@ -598,31 +597,28 @@ export const LandingView: React.FC = () => {
 
       <AnimatePresence>
         {showLogin && (
-          <ModalPortal>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[99990] recq-modal-backdrop overflow-y-auto bg-[#0B1220]/85 backdrop-blur-md"
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 overflow-y-auto bg-[#0B1220]/85 backdrop-blur-md"
+          >
+            <button
+              onClick={() => setShowLogin(false)}
+              aria-label="Close sign in"
+              className="fixed right-4 top-4 z-[60] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-300 backdrop-blur-xl transition-colors hover:text-white"
             >
-              <button
-                onClick={() => setShowLogin(false)}
-                aria-label="Close sign in"
-                className="fixed right-4 top-4 z-[99999] recq-modal-content inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-300 backdrop-blur-xl transition-colors hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.97, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.97, y: 12 }}
-                transition={{ duration: 0.22 }}
-                className="relative z-[99999] recq-modal-content"
-              >
-                <LoginView />
-              </motion.div>
+              <X className="h-4 w-4" />
+            </button>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <LoginView />
             </motion.div>
-          </ModalPortal>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -281,6 +281,7 @@ export const AddEntityButton: React.FC<Props> = ({ kind, label, className }) => 
         submitLabel={cfg.button}
         onClose={() => setOpen(false)}
         onSubmit={submit}
+        portal={kind === 'zone' || kind === 'alert'}
       />
     </>
   );

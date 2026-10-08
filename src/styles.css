@@ -171,22 +171,3 @@ html, body { background-color: #0b1220; }
   background: transparent !important;
   border: none !important;
 }
-
-/* ---------------- Global Modal & Overlay Layering System ---------------- */
-/* Ensures all modals, backdrops, and dialogs appear above ALL headers, sidebars, maps, and content */
-:root {
-  --z-header: 40;
-  --z-sidebar: 40;
-  --z-modal-backdrop: 99990;
-  --z-modal-content: 99999;
-  --z-modal-popover: 100000;
-}
-
-.recq-modal-backdrop {
-  z-index: 99990 !important;
-}
-
-.recq-modal-content {
-  z-index: 99999 !important;
-}
-
